@@ -26,67 +26,72 @@ pub mod websocket_server;
 
 #[tokio::test]
 async fn telemetry_works() {
-	common::run_with_timeout(Duration::from_secs(60 * 10), async move {
-		let config = websocket_server::Config {
-			capacity: 1,
-			max_frame_size: 1048 * 1024,
-			send_buffer_len: 32,
-			bind_address: "127.0.0.1:0".parse().unwrap(),
-		};
-		let mut server = websocket_server::WsServer::new(config).await.unwrap();
+    common::run_with_timeout(Duration::from_secs(60 * 10), async move {
+        let config = websocket_server::Config {
+            capacity: 1,
+            max_frame_size: 1048 * 1024,
+            send_buffer_len: 32,
+            bind_address: "127.0.0.1:0".parse().unwrap(),
+        };
+        let mut server = websocket_server::WsServer::new(config).await.unwrap();
 
-		let addr = server.local_addr().unwrap();
+        let addr = server.local_addr().unwrap();
 
-		let server_task = tokio::spawn(async move {
-			loop {
-				use websocket_server::Event;
-				match server.next_event().await {
-					// New connection on the listener.
-					Event::ConnectionOpen { address } => {
-						println!("New connection from {:?}", address);
-						server.accept();
-					},
+        let server_task = tokio::spawn(async move {
+            loop {
+                use websocket_server::Event;
+                match server.next_event().await {
+                    // New connection on the listener.
+                    Event::ConnectionOpen { address } => {
+                        println!("New connection from {:?}", address);
+                        server.accept();
+                    }
 
-					// Received a message from a connection.
-					Event::BinaryFrame { message, .. } => {
-						let json: serde_json::Value = serde_json::from_slice(&message).unwrap();
-						let object =
-							json.as_object().unwrap().get("payload").unwrap().as_object().unwrap();
-						if matches!(object.get("best"), Some(serde_json::Value::String(_))) {
-							break
-						}
-					},
+                    // Received a message from a connection.
+                    Event::BinaryFrame { message, .. } => {
+                        let json: serde_json::Value = serde_json::from_slice(&message).unwrap();
+                        let object = json
+                            .as_object()
+                            .unwrap()
+                            .get("payload")
+                            .unwrap()
+                            .as_object()
+                            .unwrap();
+                        if matches!(object.get("best"), Some(serde_json::Value::String(_))) {
+                            break;
+                        }
+                    }
 
-					Event::TextFrame { .. } => {
-						panic!("Got a TextFrame over the socket, this is a bug")
-					},
+                    Event::TextFrame { .. } => {
+                        panic!("Got a TextFrame over the socket, this is a bug")
+                    }
 
-					// Connection has been closed.
-					Event::ConnectionError { .. } => {},
-				}
-			}
-		});
+                    // Connection has been closed.
+                    Event::ConnectionError { .. } => {}
+                }
+            }
+        });
 
-		let mut substrate = process::Command::new(cargo_bin("rollup-node"));
+        let mut substrate = process::Command::new(cargo_bin("rollup-node"));
 
-		let mut substrate = KillChildOnDrop(
-			substrate
-				.args(&["--dev", "--tmp", "--telemetry-url"])
-				.arg(format!("ws://{} 10", addr))
-				.arg("--no-hardware-benchmarks")
-				.stdout(process::Stdio::piped())
-				.stderr(process::Stdio::piped())
-				.stdin(process::Stdio::null())
-				.spawn()
-				.unwrap(),
-		);
+        let mut substrate = KillChildOnDrop(
+            substrate
+                .args(&["--dev", "--tmp", "--telemetry-url"])
+                .arg(format!("ws://{} 10", addr))
+                .arg("--no-hardware-benchmarks")
+                .stdout(process::Stdio::piped())
+                .stderr(process::Stdio::piped())
+                .stdin(process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
 
-		server_task.await.expect("server task panicked");
+        server_task.await.expect("server task panicked");
 
-		substrate.assert_still_running();
+        substrate.assert_still_running();
 
-		// Stop the process
-		substrate.stop();
-	})
-	.await;
+        // Stop the process
+        substrate.stop();
+    })
+    .await;
 }

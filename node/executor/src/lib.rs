@@ -25,16 +25,16 @@ pub use sc_executor::NativeElseWasmExecutor;
 pub struct ExecutorDispatch;
 
 impl sc_executor::NativeExecutionDispatch for ExecutorDispatch {
-	type ExtendHostFunctions = (
-		frame_benchmarking::benchmarking::HostFunctions,
-		sp_statement_store::runtime_api::HostFunctions,
-	);
+    type ExtendHostFunctions = (
+        frame_benchmarking::benchmarking::HostFunctions,
+        sp_statement_store::runtime_api::HostFunctions,
+    );
 
-	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		rollup_runtime::api::dispatch(method, data)
-	}
+    fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
+        rollup_runtime::api::dispatch(method, data)
+    }
 
-	fn native_version() -> sc_executor::NativeVersion {
-		rollup_runtime::native_version()
-	}
+    fn native_version() -> sc_executor::NativeVersion {
+        rollup_runtime::native_version()
+    }
 }

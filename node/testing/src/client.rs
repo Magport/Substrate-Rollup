@@ -30,10 +30,10 @@ pub type Backend = sc_client_db::Backend<node_primitives::Block>;
 
 /// Test client type.
 pub type Client = client::Client<
-	Backend,
-	client::LocalCallExecutor<node_primitives::Block, Backend, ExecutorDispatch>,
-	node_primitives::Block,
-	rollup_runtime::RuntimeApi,
+    Backend,
+    client::LocalCallExecutor<node_primitives::Block, Backend, ExecutorDispatch>,
+    node_primitives::Block,
+    rollup_runtime::RuntimeApi,
 >;
 
 /// Genesis configuration parameters for `TestClient`.
@@ -41,38 +41,38 @@ pub type Client = client::Client<
 pub struct GenesisParameters;
 
 impl substrate_test_client::GenesisInit for GenesisParameters {
-	fn genesis_storage(&self) -> Storage {
-		let mut storage = crate::genesis::config().build_storage().unwrap();
-		storage.top.insert(
-			sp_core::storage::well_known_keys::CODE.to_vec(),
-			rollup_runtime::wasm_binary_unwrap().into(),
-		);
-		storage
-	}
+    fn genesis_storage(&self) -> Storage {
+        let mut storage = crate::genesis::config().build_storage().unwrap();
+        storage.top.insert(
+            sp_core::storage::well_known_keys::CODE.to_vec(),
+            rollup_runtime::wasm_binary_unwrap().into(),
+        );
+        storage
+    }
 }
 
 /// A `test-runtime` extensions to `TestClientBuilder`.
 pub trait TestClientBuilderExt: Sized {
-	/// Create test client builder.
-	fn new() -> Self;
+    /// Create test client builder.
+    fn new() -> Self;
 
-	/// Build the test client.
-	fn build(self) -> Client;
+    /// Build the test client.
+    fn build(self) -> Client;
 }
 
 impl TestClientBuilderExt
-	for substrate_test_client::TestClientBuilder<
-		node_primitives::Block,
-		client::LocalCallExecutor<node_primitives::Block, Backend, ExecutorDispatch>,
-		Backend,
-		GenesisParameters,
-	>
+    for substrate_test_client::TestClientBuilder<
+        node_primitives::Block,
+        client::LocalCallExecutor<node_primitives::Block, Backend, ExecutorDispatch>,
+        Backend,
+        GenesisParameters,
+    >
 {
-	fn new() -> Self {
-		Self::default()
-	}
+    fn new() -> Self {
+        Self::default()
+    }
 
-	fn build(self) -> Client {
-		self.build_with_native_executor(None).0
-	}
+    fn build(self) -> Client {
+        self.build_with_native_executor(None).0
+    }
 }

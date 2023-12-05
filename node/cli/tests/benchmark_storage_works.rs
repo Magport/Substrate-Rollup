@@ -20,36 +20,36 @@
 
 use assert_cmd::cargo::cargo_bin;
 use std::{
-	path::Path,
-	process::{Command, ExitStatus},
+    path::Path,
+    process::{Command, ExitStatus},
 };
 use tempfile::tempdir;
 
 /// Tests that the `benchmark storage` command works for the dev runtime.
 #[test]
 fn benchmark_storage_works() {
-	let tmp_dir = tempdir().expect("could not create a temp dir");
-	let base_path = tmp_dir.path();
+    let tmp_dir = tempdir().expect("could not create a temp dir");
+    let base_path = tmp_dir.path();
 
-	// Benchmarking the storage works and creates the correct weight file.
-	assert!(benchmark_storage("rocksdb", base_path).success());
-	assert!(base_path.join("rocksdb_weights.rs").exists());
+    // Benchmarking the storage works and creates the correct weight file.
+    assert!(benchmark_storage("rocksdb", base_path).success());
+    assert!(base_path.join("rocksdb_weights.rs").exists());
 
-	assert!(benchmark_storage("paritydb", base_path).success());
-	assert!(base_path.join("paritydb_weights.rs").exists());
+    assert!(benchmark_storage("paritydb", base_path).success());
+    assert!(base_path.join("paritydb_weights.rs").exists());
 }
 
 fn benchmark_storage(db: &str, base_path: &Path) -> ExitStatus {
-	Command::new(cargo_bin("rollup-node"))
-		.args(&["benchmark", "storage", "--dev"])
-		.arg("--db")
-		.arg(db)
-		.arg("--weight-path")
-		.arg(base_path)
-		.args(["--state-version", "1"])
-		.args(["--warmups", "0"])
-		.args(["--add", "100", "--mul", "1.2", "--metric", "p75"])
-		.arg("--include-child-trees")
-		.status()
-		.unwrap()
+    Command::new(cargo_bin("rollup-node"))
+        .args(&["benchmark", "storage", "--dev"])
+        .arg("--db")
+        .arg(db)
+        .arg("--weight-path")
+        .arg(base_path)
+        .args(["--state-version", "1"])
+        .args(["--warmups", "0"])
+        .args(["--add", "100", "--mul", "1.2", "--metric", "p75"])
+        .arg("--include-child-trees")
+        .status()
+        .unwrap()
 }

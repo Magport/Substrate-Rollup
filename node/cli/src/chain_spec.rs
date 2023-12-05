@@ -19,10 +19,10 @@
 //! Substrate chain configurations.
 
 use grandpa_primitives::AuthorityId as GrandpaId;
-use rollup_runtime::{
-	constants::currency::*, wasm_binary_unwrap, Block, MaxNominations, SessionKeys, StakerStatus,
-};
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use rollup_runtime::{
+    constants::currency::*, wasm_binary_unwrap, Block, MaxNominations, SessionKeys, StakerStatus,
+};
 use sc_chain_spec::ChainSpecExtension;
 use sc_service::ChainType;
 use sc_telemetry::TelemetryEndpoints;
@@ -32,12 +32,12 @@ use sp_consensus_babe::AuthorityId as BabeId;
 use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public};
 use sp_mixnet::types::AuthorityId as MixnetId;
 use sp_runtime::{
-	traits::{IdentifyAccount, Verify},
-	Perbill,
+    traits::{IdentifyAccount, Verify},
+    Perbill,
 };
 
-pub use rollup_runtime::RuntimeGenesisConfig;
 pub use node_primitives::{AccountId, Balance, Signature};
+pub use rollup_runtime::RuntimeGenesisConfig;
 
 type AccountPublic = <Signature as Verify>::Signer;
 
@@ -52,33 +52,47 @@ const STASH: Balance = ENDOWMENT / 1000;
 #[derive(Default, Clone, Serialize, Deserialize, ChainSpecExtension)]
 #[serde(rename_all = "camelCase")]
 pub struct Extensions {
-	/// Block numbers with known hashes.
-	pub fork_blocks: sc_client_api::ForkBlocks<Block>,
-	/// Known bad block hashes.
-	pub bad_blocks: sc_client_api::BadBlocks<Block>,
-	/// The light sync state extension used by the sync-state rpc.
-	pub light_sync_state: sc_sync_state_rpc::LightSyncStateExtension,
+    /// Block numbers with known hashes.
+    pub fork_blocks: sc_client_api::ForkBlocks<Block>,
+    /// Known bad block hashes.
+    pub bad_blocks: sc_client_api::BadBlocks<Block>,
+    /// The light sync state extension used by the sync-state rpc.
+    pub light_sync_state: sc_sync_state_rpc::LightSyncStateExtension,
 }
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = sc_service::GenericChainSpec<RuntimeGenesisConfig, Extensions>;
 
 fn session_keys(
-	grandpa: GrandpaId,
-	babe: BabeId,
-	im_online: ImOnlineId,
-	authority_discovery: AuthorityDiscoveryId,
-	mixnet: MixnetId,
+    grandpa: GrandpaId,
+    babe: BabeId,
+    im_online: ImOnlineId,
+    authority_discovery: AuthorityDiscoveryId,
+    mixnet: MixnetId,
 ) -> SessionKeys {
-	SessionKeys { grandpa, babe, im_online, authority_discovery, mixnet }
+    SessionKeys {
+        grandpa,
+        babe,
+        im_online,
+        authority_discovery,
+        mixnet,
+    }
 }
 
 fn configure_accounts_for_rollup_testnet() -> (
-	Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId, MixnetId)>,
-	AccountId,
-	Vec<AccountId>,
+    Vec<(
+        AccountId,
+        AccountId,
+        GrandpaId,
+        BabeId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+        MixnetId,
+    )>,
+    AccountId,
+    Vec<AccountId>,
 ) {
-	#[rustfmt::skip]
+    #[rustfmt::skip]
 	// stash, controller, session-key
 	// generated with secret:
 	// for i in 1 2 3 4 ; do for j in stash controller; do subkey inspect "$secret"/fir/$j/$i; done; done
@@ -182,326 +196,369 @@ fn configure_accounts_for_rollup_testnet() -> (
 		),
 	];
 
-	// generated with secret: subkey inspect "$secret"/fir
-	let root_key: AccountId = array_bytes::hex_n_into_unchecked(
-		// 5Ff3iXP75ruzroPWRP2FYBHWnmGGBSb63857BgnzCoXNxfPo
-		"9ee5e5bdc0ec239eb164f865ecc345ce4c88e76ee002e0f7e318097347471809",
-	);
+    // generated with secret: subkey inspect "$secret"/fir
+    let root_key: AccountId = array_bytes::hex_n_into_unchecked(
+        // 5Ff3iXP75ruzroPWRP2FYBHWnmGGBSb63857BgnzCoXNxfPo
+        "9ee5e5bdc0ec239eb164f865ecc345ce4c88e76ee002e0f7e318097347471809",
+    );
 
-	let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
-	(initial_authorities, root_key, endowed_accounts)
+    let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
+    (initial_authorities, root_key, endowed_accounts)
 }
 
 fn rollup_testnet_config_genesis() -> serde_json::Value {
-	let (initial_authorities, root_key, endowed_accounts) =
-		configure_accounts_for_rollup_testnet();
-	testnet_genesis(initial_authorities, vec![], root_key, Some(endowed_accounts))
+    let (initial_authorities, root_key, endowed_accounts) = configure_accounts_for_rollup_testnet();
+    testnet_genesis(
+        initial_authorities,
+        vec![],
+        root_key,
+        Some(endowed_accounts),
+    )
 }
 
 /// Rollup testnet config
 pub fn rollup_chain_config() -> ChainSpec {
-	let boot_nodes = vec![];
-	ChainSpec::builder(wasm_binary_unwrap(), Default::default())
-		.with_name("Substrate-rollup Testnet")
-		.with_id("Substrate-rollup_testnet")
-		.with_chain_type(ChainType::Live)
-		.with_genesis_config_patch(rollup_testnet_config_genesis())
-		.with_telemetry_endpoints(
-			TelemetryEndpoints::new(vec![(ROLLUP_TELEMETRY_URL.to_string(), 0)])
-				.expect("Rollup telemetry url is valid; qed"),
-		)
-		.with_boot_nodes(boot_nodes)
-		.with_properties(get_chain_properties())
-		.build()
+    let boot_nodes = vec![];
+    ChainSpec::builder(wasm_binary_unwrap(), Default::default())
+        .with_name("Substrate-rollup Testnet")
+        .with_id("Substrate-rollup_testnet")
+        .with_chain_type(ChainType::Live)
+        .with_genesis_config_patch(rollup_testnet_config_genesis())
+        .with_telemetry_endpoints(
+            TelemetryEndpoints::new(vec![(ROLLUP_TELEMETRY_URL.to_string(), 0)])
+                .expect("Rollup telemetry url is valid; qed"),
+        )
+        .with_boot_nodes(boot_nodes)
+        .with_properties(get_chain_properties())
+        .build()
 }
 
 /// Returns common properties for all modes
 fn get_chain_properties() -> serde_json::map::Map<String, serde_json::Value> {
-	let mut properties = serde_json::map::Map::new();
-	properties.insert("tokenDecimals".into(), serde_json::json!(18));
-	properties.insert("tokenSymbol".into(), serde_json::json!("MSM"));
-	properties
+    let mut properties = serde_json::map::Map::new();
+    properties.insert("tokenDecimals".into(), serde_json::json!(18));
+    properties.insert("tokenSymbol".into(), serde_json::json!("MSM"));
+    properties
 }
 
 /// Helper function to generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-	TPublic::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
+    TPublic::Pair::from_string(&format!("//{}", seed), None)
+        .expect("static values are valid; qed")
+        .public()
 }
 
 /// Helper function to generate an account ID from seed.
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 where
-	AccountPublic: From<<TPublic::Pair as Pair>::Public>,
+    AccountPublic: From<<TPublic::Pair as Pair>::Public>,
 {
-	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
+    AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
 /// Helper function to generate stash, controller and session key from seed.
 pub fn authority_keys_from_seed(
-	seed: &str,
-) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId, MixnetId) {
-	(
-		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
-		get_account_id_from_seed::<sr25519::Public>(seed),
-		get_from_seed::<GrandpaId>(seed),
-		get_from_seed::<BabeId>(seed),
-		get_from_seed::<ImOnlineId>(seed),
-		get_from_seed::<AuthorityDiscoveryId>(seed),
-		get_from_seed::<MixnetId>(seed),
-	)
+    seed: &str,
+) -> (
+    AccountId,
+    AccountId,
+    GrandpaId,
+    BabeId,
+    ImOnlineId,
+    AuthorityDiscoveryId,
+    MixnetId,
+) {
+    (
+        get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+        get_account_id_from_seed::<sr25519::Public>(seed),
+        get_from_seed::<GrandpaId>(seed),
+        get_from_seed::<BabeId>(seed),
+        get_from_seed::<ImOnlineId>(seed),
+        get_from_seed::<AuthorityDiscoveryId>(seed),
+        get_from_seed::<MixnetId>(seed),
+    )
 }
 
 fn configure_accounts(
-	initial_authorities: Vec<(
-		AccountId,
-		AccountId,
-		GrandpaId,
-		BabeId,
-		ImOnlineId,
-		AuthorityDiscoveryId,
-		MixnetId,
-	)>,
-	initial_nominators: Vec<AccountId>,
-	endowed_accounts: Option<Vec<AccountId>>,
-	stash: Balance,
+    initial_authorities: Vec<(
+        AccountId,
+        AccountId,
+        GrandpaId,
+        BabeId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+        MixnetId,
+    )>,
+    initial_nominators: Vec<AccountId>,
+    endowed_accounts: Option<Vec<AccountId>>,
+    stash: Balance,
 ) -> (
-	Vec<(AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId, MixnetId)>,
-	Vec<AccountId>,
-	usize,
-	Vec<(AccountId, AccountId, Balance, StakerStatus<AccountId>)>,
+    Vec<(
+        AccountId,
+        AccountId,
+        GrandpaId,
+        BabeId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+        MixnetId,
+    )>,
+    Vec<AccountId>,
+    usize,
+    Vec<(AccountId, AccountId, Balance, StakerStatus<AccountId>)>,
 ) {
-	let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
-		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-		]
-	});
-	// endow all authorities and nominators.
-	initial_authorities
-		.iter()
-		.map(|x| &x.0)
-		.chain(initial_nominators.iter())
-		.for_each(|x| {
-			if !endowed_accounts.contains(x) {
-				endowed_accounts.push(x.clone())
-			}
-		});
+    let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
+        vec![
+            get_account_id_from_seed::<sr25519::Public>("Alice"),
+            get_account_id_from_seed::<sr25519::Public>("Bob"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie"),
+            get_account_id_from_seed::<sr25519::Public>("Dave"),
+            get_account_id_from_seed::<sr25519::Public>("Eve"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+            get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
+            get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+        ]
+    });
+    // endow all authorities and nominators.
+    initial_authorities
+        .iter()
+        .map(|x| &x.0)
+        .chain(initial_nominators.iter())
+        .for_each(|x| {
+            if !endowed_accounts.contains(x) {
+                endowed_accounts.push(x.clone())
+            }
+        });
 
-	// stakers: all validators and nominators.
-	let mut rng = rand::thread_rng();
-	let stakers = initial_authorities
-		.iter()
-		.map(|x| (x.0.clone(), x.0.clone(), stash, StakerStatus::Validator))
-		.chain(initial_nominators.iter().map(|x| {
-			use rand::{seq::SliceRandom, Rng};
-			let limit = (MaxNominations::get() as usize).min(initial_authorities.len());
-			let count = rng.gen::<usize>() % limit;
-			let nominations = initial_authorities
-				.as_slice()
-				.choose_multiple(&mut rng, count)
-				.into_iter()
-				.map(|choice| choice.0.clone())
-				.collect::<Vec<_>>();
-			(x.clone(), x.clone(), stash, StakerStatus::Nominator(nominations))
-		}))
-		.collect::<Vec<_>>();
+    // stakers: all validators and nominators.
+    let mut rng = rand::thread_rng();
+    let stakers = initial_authorities
+        .iter()
+        .map(|x| (x.0.clone(), x.0.clone(), stash, StakerStatus::Validator))
+        .chain(initial_nominators.iter().map(|x| {
+            use rand::{seq::SliceRandom, Rng};
+            let limit = (MaxNominations::get() as usize).min(initial_authorities.len());
+            let count = rng.gen::<usize>() % limit;
+            let nominations = initial_authorities
+                .as_slice()
+                .choose_multiple(&mut rng, count)
+                .into_iter()
+                .map(|choice| choice.0.clone())
+                .collect::<Vec<_>>();
+            (
+                x.clone(),
+                x.clone(),
+                stash,
+                StakerStatus::Nominator(nominations),
+            )
+        }))
+        .collect::<Vec<_>>();
 
-	let num_endowed_accounts = endowed_accounts.len();
+    let num_endowed_accounts = endowed_accounts.len();
 
-	(initial_authorities, endowed_accounts, num_endowed_accounts, stakers)
+    (
+        initial_authorities,
+        endowed_accounts,
+        num_endowed_accounts,
+        stakers,
+    )
 }
 
 /// Helper function to create RuntimeGenesisConfig json patch for testing.
 pub fn testnet_genesis(
-	initial_authorities: Vec<(
-		AccountId,
-		AccountId,
-		GrandpaId,
-		BabeId,
-		ImOnlineId,
-		AuthorityDiscoveryId,
-		MixnetId,
-	)>,
-	initial_nominators: Vec<AccountId>,
-	root_key: AccountId,
-	endowed_accounts: Option<Vec<AccountId>>,
+    initial_authorities: Vec<(
+        AccountId,
+        AccountId,
+        GrandpaId,
+        BabeId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+        MixnetId,
+    )>,
+    initial_nominators: Vec<AccountId>,
+    root_key: AccountId,
+    endowed_accounts: Option<Vec<AccountId>>,
 ) -> serde_json::Value {
-	let (initial_authorities, endowed_accounts, num_endowed_accounts, stakers) =
-		configure_accounts(initial_authorities, initial_nominators, endowed_accounts, STASH);
+    let (initial_authorities, endowed_accounts, num_endowed_accounts, stakers) = configure_accounts(
+        initial_authorities,
+        initial_nominators,
+        endowed_accounts,
+        STASH,
+    );
 
-	serde_json::json!({
-		"balances": {
-			"balances": endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect::<Vec<_>>(),
-		},
-		"session": {
-			"keys": initial_authorities
-				.iter()
-				.map(|x| {
-					(
-						x.0.clone(),
-						x.0.clone(),
-						session_keys(
-							x.2.clone(),
-							x.3.clone(),
-							x.4.clone(),
-							x.5.clone(),
-							x.6.clone(),
-						),
-					)
-				})
-				.collect::<Vec<_>>(),
-		},
-		"staking": {
-			"validatorCount": initial_authorities.len() as u32,
-			"minimumValidatorCount": initial_authorities.len() as u32,
-			"invulnerables": initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
-			"slashRewardFraction": Perbill::from_percent(10),
-			"stakers": stakers.clone(),
-		},
-		"elections": {
-			"members": endowed_accounts
-				.iter()
-				.take((num_endowed_accounts + 1) / 2)
-				.cloned()
-				.map(|member| (member, STASH))
-				.collect::<Vec<_>>(),
-		},
-		"technicalCommittee": {
-			"members": endowed_accounts
-				.iter()
-				.take((num_endowed_accounts + 1) / 2)
-				.cloned()
-				.collect::<Vec<_>>(),
-		},
-		"sudo": { "key": Some(root_key.clone()) },
-		"babe": {
-			"epochConfig": Some(rollup_runtime::BABE_GENESIS_EPOCH_CONFIG),
-		},
-		"society": { "pot": 0 },
-		"assets": {
-			// This asset is used by the NIS pallet as counterpart currency.
-			"assets": vec![(9, get_account_id_from_seed::<sr25519::Public>("Alice"), true, 1)],
-		},
-		"nominationPools": {
-			"minCreateBond": 10 * DOLLARS,
-			"minJoinBond": 1 * DOLLARS,
-		},
-	})
+    serde_json::json!({
+        "balances": {
+            "balances": endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).collect::<Vec<_>>(),
+        },
+        "session": {
+            "keys": initial_authorities
+                .iter()
+                .map(|x| {
+                    (
+                        x.0.clone(),
+                        x.0.clone(),
+                        session_keys(
+                            x.2.clone(),
+                            x.3.clone(),
+                            x.4.clone(),
+                            x.5.clone(),
+                            x.6.clone(),
+                        ),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        },
+        "staking": {
+            "validatorCount": initial_authorities.len() as u32,
+            "minimumValidatorCount": initial_authorities.len() as u32,
+            "invulnerables": initial_authorities.iter().map(|x| x.0.clone()).collect::<Vec<_>>(),
+            "slashRewardFraction": Perbill::from_percent(10),
+            "stakers": stakers.clone(),
+        },
+        "elections": {
+            "members": endowed_accounts
+                .iter()
+                .take((num_endowed_accounts + 1) / 2)
+                .cloned()
+                .map(|member| (member, STASH))
+                .collect::<Vec<_>>(),
+        },
+        "technicalCommittee": {
+            "members": endowed_accounts
+                .iter()
+                .take((num_endowed_accounts + 1) / 2)
+                .cloned()
+                .collect::<Vec<_>>(),
+        },
+        "sudo": { "key": Some(root_key.clone()) },
+        "babe": {
+            "epochConfig": Some(rollup_runtime::BABE_GENESIS_EPOCH_CONFIG),
+        },
+        "society": { "pot": 0 },
+        "assets": {
+            // This asset is used by the NIS pallet as counterpart currency.
+            "assets": vec![(9, get_account_id_from_seed::<sr25519::Public>("Alice"), true, 1)],
+        },
+        "nominationPools": {
+            "minCreateBond": 10 * DOLLARS,
+            "minJoinBond": 1 * DOLLARS,
+        },
+    })
 }
 
 fn development_config_genesis_json() -> serde_json::Value {
-	testnet_genesis(
-		vec![authority_keys_from_seed("Alice")],
-		vec![],
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		None,
-	)
+    testnet_genesis(
+        vec![authority_keys_from_seed("Alice")],
+        vec![],
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        None,
+    )
 }
 
 /// Development config (single validator Alice).
 pub fn development_config() -> ChainSpec {
-	ChainSpec::builder(wasm_binary_unwrap(), Default::default())
-		.with_name("Development")
-		.with_id("dev")
-		.with_chain_type(ChainType::Development)
-		.with_genesis_config_patch(development_config_genesis_json())
-		.with_properties(get_chain_properties())
-		.build()
+    ChainSpec::builder(wasm_binary_unwrap(), Default::default())
+        .with_name("Development")
+        .with_id("dev")
+        .with_chain_type(ChainType::Development)
+        .with_genesis_config_patch(development_config_genesis_json())
+        .with_properties(get_chain_properties())
+        .build()
 }
 
 fn local_testnet_genesis() -> serde_json::Value {
-	testnet_genesis(
-		vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
-		vec![],
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		None,
-	)
+    testnet_genesis(
+        vec![
+            authority_keys_from_seed("Alice"),
+            authority_keys_from_seed("Bob"),
+        ],
+        vec![],
+        get_account_id_from_seed::<sr25519::Public>("Alice"),
+        None,
+    )
 }
 
 /// Local testnet config (multivalidator Alice + Bob).
 pub fn local_testnet_config() -> ChainSpec {
-	ChainSpec::builder(wasm_binary_unwrap(), Default::default())
-		.with_name("Local Testnet")
-		.with_id("local_testnet")
-		.with_chain_type(ChainType::Local)
-		.with_genesis_config_patch(local_testnet_genesis())
-		.build()
+    ChainSpec::builder(wasm_binary_unwrap(), Default::default())
+        .with_name("Local Testnet")
+        .with_id("local_testnet")
+        .with_chain_type(ChainType::Local)
+        .with_genesis_config_patch(local_testnet_genesis())
+        .build()
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-	use super::*;
-	use crate::service::{new_full_base, NewFullBase};
-	use sc_service_test;
-	use sp_runtime::BuildStorage;
+    use super::*;
+    use crate::service::{new_full_base, NewFullBase};
+    use sc_service_test;
+    use sp_runtime::BuildStorage;
 
-	/// Local testnet config (single validator - Alice).
-	pub fn integration_test_config_with_single_authority() -> ChainSpec {
-		ChainSpec::builder(wasm_binary_unwrap(), Default::default())
-			.with_name("Integration Test")
-			.with_id("test")
-			.with_chain_type(ChainType::Development)
-			.with_genesis_config_patch(testnet_genesis(
-				vec![authority_keys_from_seed("Alice")],
-				vec![],
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				None,
-			))
-			.build()
-	}
+    /// Local testnet config (single validator - Alice).
+    pub fn integration_test_config_with_single_authority() -> ChainSpec {
+        ChainSpec::builder(wasm_binary_unwrap(), Default::default())
+            .with_name("Integration Test")
+            .with_id("test")
+            .with_chain_type(ChainType::Development)
+            .with_genesis_config_patch(testnet_genesis(
+                vec![authority_keys_from_seed("Alice")],
+                vec![],
+                get_account_id_from_seed::<sr25519::Public>("Alice"),
+                None,
+            ))
+            .build()
+    }
 
-	/// Local testnet config (multivalidator Alice + Bob).
-	pub fn integration_test_config_with_two_authorities() -> ChainSpec {
-		ChainSpec::builder(wasm_binary_unwrap(), Default::default())
-			.with_name("Integration Test")
-			.with_id("test")
-			.with_chain_type(ChainType::Development)
-			.with_genesis_config_patch(local_testnet_genesis())
-			.build()
-	}
+    /// Local testnet config (multivalidator Alice + Bob).
+    pub fn integration_test_config_with_two_authorities() -> ChainSpec {
+        ChainSpec::builder(wasm_binary_unwrap(), Default::default())
+            .with_name("Integration Test")
+            .with_id("test")
+            .with_chain_type(ChainType::Development)
+            .with_genesis_config_patch(local_testnet_genesis())
+            .build()
+    }
 
-	#[test]
-	#[ignore]
-	fn test_connectivity() {
-		sp_tracing::try_init_simple();
+    #[test]
+    #[ignore]
+    fn test_connectivity() {
+        sp_tracing::try_init_simple();
 
-		sc_service_test::connectivity(integration_test_config_with_two_authorities(), |config| {
-			let NewFullBase { task_manager, client, network, sync, transaction_pool, .. } =
-				new_full_base(config, None, false, |_, _| ())?;
-			Ok(sc_service_test::TestNetComponents::new(
-				task_manager,
-				client,
-				network,
-				sync,
-				transaction_pool,
-			))
-		});
-	}
+        sc_service_test::connectivity(integration_test_config_with_two_authorities(), |config| {
+            let NewFullBase {
+                task_manager,
+                client,
+                network,
+                sync,
+                transaction_pool,
+                ..
+            } = new_full_base(config, None, false, |_, _| ())?;
+            Ok(sc_service_test::TestNetComponents::new(
+                task_manager,
+                client,
+                network,
+                sync,
+                transaction_pool,
+            ))
+        });
+    }
 
-	#[test]
-	fn test_create_development_chain_spec() {
-		development_config().build_storage().unwrap();
-	}
+    #[test]
+    fn test_create_development_chain_spec() {
+        development_config().build_storage().unwrap();
+    }
 
-	#[test]
-	fn test_create_local_testnet_chain_spec() {
-		local_testnet_config().build_storage().unwrap();
-	}
+    #[test]
+    fn test_create_local_testnet_chain_spec() {
+        local_testnet_config().build_storage().unwrap();
+    }
 
-	#[test]
-	fn test_rollup_test_net_chain_spec() {
-		rollup_testnet_config().build_storage().unwrap();
-	}
+    #[test]
+    fn test_rollup_test_net_chain_spec() {
+        rollup_testnet_config().build_storage().unwrap();
+    }
 }

@@ -33,154 +33,164 @@ use clap::Parser;
 use node_testing::bench::{BlockType, DatabaseType as BenchDataBaseType, KeyTypes};
 
 use crate::{
-	common::SizeType,
-	construct::ConstructionBenchmarkDescription,
-	core::{run_benchmark, Mode as BenchmarkMode},
-	import::ImportBenchmarkDescription,
-	tempdb::DatabaseType,
-	trie::{DatabaseSize, TrieReadBenchmarkDescription, TrieWriteBenchmarkDescription},
-	txpool::PoolBenchmarkDescription,
+    common::SizeType,
+    construct::ConstructionBenchmarkDescription,
+    core::{run_benchmark, Mode as BenchmarkMode},
+    import::ImportBenchmarkDescription,
+    tempdb::DatabaseType,
+    trie::{DatabaseSize, TrieReadBenchmarkDescription, TrieWriteBenchmarkDescription},
+    txpool::PoolBenchmarkDescription,
 };
 
 #[derive(Debug, Parser)]
 #[command(name = "node-bench", about = "Node integration benchmarks")]
 struct Opt {
-	/// Show list of all available benchmarks.
-	///
-	/// Will output ("name", "path"). Benchmarks can then be filtered by path.
-	#[arg(short, long)]
-	list: bool,
+    /// Show list of all available benchmarks.
+    ///
+    /// Will output ("name", "path"). Benchmarks can then be filtered by path.
+    #[arg(short, long)]
+    list: bool,
 
-	/// Machine readable json output.
-	///
-	/// This also suppresses all regular output (except to stderr)
-	#[arg(short, long)]
-	json: bool,
+    /// Machine readable json output.
+    ///
+    /// This also suppresses all regular output (except to stderr)
+    #[arg(short, long)]
+    json: bool,
 
-	/// Filter benchmarks.
-	///
-	/// Run with `--list` for the hint of what to filter.
-	filter: Option<String>,
+    /// Filter benchmarks.
+    ///
+    /// Run with `--list` for the hint of what to filter.
+    filter: Option<String>,
 
-	/// Number of transactions for block import with `custom` size.
-	#[arg(long)]
-	transactions: Option<usize>,
+    /// Number of transactions for block import with `custom` size.
+    #[arg(long)]
+    transactions: Option<usize>,
 
-	/// Mode
-	///
-	/// "regular" for regular benchmark
-	///
-	/// "profile" mode adds pauses between measurable runs,
-	/// so that actual interval can be selected in the profiler of choice.
-	#[arg(short, long, default_value = "regular")]
-	mode: BenchmarkMode,
+    /// Mode
+    ///
+    /// "regular" for regular benchmark
+    ///
+    /// "profile" mode adds pauses between measurable runs,
+    /// so that actual interval can be selected in the profiler of choice.
+    #[arg(short, long, default_value = "regular")]
+    mode: BenchmarkMode,
 }
 
 fn main() {
-	let opt = Opt::parse();
+    let opt = Opt::parse();
 
-	if !opt.json {
-		sp_tracing::try_init_simple();
-	}
+    if !opt.json {
+        sp_tracing::try_init_simple();
+    }
 
-	let mut import_benchmarks = Vec::new();
+    let mut import_benchmarks = Vec::new();
 
-	for size in [
-		SizeType::Empty,
-		SizeType::Small,
-		SizeType::Medium,
-		SizeType::Large,
-		SizeType::Full,
-		SizeType::Custom(opt.transactions.unwrap_or(0)),
-	] {
-		for block_type in [
-			BlockType::RandomTransfersKeepAlive,
-			BlockType::RandomTransfersReaping,
-			BlockType::Noop,
-		] {
-			for database_type in [BenchDataBaseType::RocksDb, BenchDataBaseType::ParityDb] {
-				import_benchmarks.push((size, block_type, database_type));
-			}
-		}
-	}
+    for size in [
+        SizeType::Empty,
+        SizeType::Small,
+        SizeType::Medium,
+        SizeType::Large,
+        SizeType::Full,
+        SizeType::Custom(opt.transactions.unwrap_or(0)),
+    ] {
+        for block_type in [
+            BlockType::RandomTransfersKeepAlive,
+            BlockType::RandomTransfersReaping,
+            BlockType::Noop,
+        ] {
+            for database_type in [BenchDataBaseType::RocksDb, BenchDataBaseType::ParityDb] {
+                import_benchmarks.push((size, block_type, database_type));
+            }
+        }
+    }
 
-	let benchmarks = matrix!(
-		(size, block_type, database_type) in import_benchmarks.into_iter() =>
-			ImportBenchmarkDescription {
-				key_types: KeyTypes::Sr25519,
-				size,
-				block_type,
-				database_type,
-			},
-		(size, db_type) in
-			[
-				DatabaseSize::Empty, DatabaseSize::Smallest, DatabaseSize::Small,
-				DatabaseSize::Medium, DatabaseSize::Large, DatabaseSize::Huge,
-			]
-			.iter().flat_map(|size|
-			[
-				DatabaseType::RocksDb, DatabaseType::ParityDb
-			]
-			.iter().map(move |db_type| (size, db_type)))
-			=> TrieReadBenchmarkDescription { database_size: *size, database_type: *db_type },
-		(size, db_type) in
-			[
-				DatabaseSize::Empty, DatabaseSize::Smallest, DatabaseSize::Small,
-				DatabaseSize::Medium, DatabaseSize::Large, DatabaseSize::Huge,
-			]
-			.iter().flat_map(|size|
-			[
-				DatabaseType::RocksDb, DatabaseType::ParityDb
-			]
-			.iter().map(move |db_type| (size, db_type)))
-			=> TrieWriteBenchmarkDescription { database_size: *size, database_type: *db_type },
-		ConstructionBenchmarkDescription {
-			key_types: KeyTypes::Sr25519,
-			block_type: BlockType::RandomTransfersKeepAlive,
-			size: SizeType::Medium,
-			database_type: BenchDataBaseType::RocksDb,
-		},
-		ConstructionBenchmarkDescription {
-			key_types: KeyTypes::Sr25519,
-			block_type: BlockType::RandomTransfersKeepAlive,
-			size: SizeType::Large,
-			database_type: BenchDataBaseType::RocksDb,
-		},
-		PoolBenchmarkDescription { database_type: BenchDataBaseType::RocksDb },
-	);
+    let benchmarks = matrix!(
+        (size, block_type, database_type) in import_benchmarks.into_iter() =>
+            ImportBenchmarkDescription {
+                key_types: KeyTypes::Sr25519,
+                size,
+                block_type,
+                database_type,
+            },
+        (size, db_type) in
+            [
+                DatabaseSize::Empty, DatabaseSize::Smallest, DatabaseSize::Small,
+                DatabaseSize::Medium, DatabaseSize::Large, DatabaseSize::Huge,
+            ]
+            .iter().flat_map(|size|
+            [
+                DatabaseType::RocksDb, DatabaseType::ParityDb
+            ]
+            .iter().map(move |db_type| (size, db_type)))
+            => TrieReadBenchmarkDescription { database_size: *size, database_type: *db_type },
+        (size, db_type) in
+            [
+                DatabaseSize::Empty, DatabaseSize::Smallest, DatabaseSize::Small,
+                DatabaseSize::Medium, DatabaseSize::Large, DatabaseSize::Huge,
+            ]
+            .iter().flat_map(|size|
+            [
+                DatabaseType::RocksDb, DatabaseType::ParityDb
+            ]
+            .iter().map(move |db_type| (size, db_type)))
+            => TrieWriteBenchmarkDescription { database_size: *size, database_type: *db_type },
+        ConstructionBenchmarkDescription {
+            key_types: KeyTypes::Sr25519,
+            block_type: BlockType::RandomTransfersKeepAlive,
+            size: SizeType::Medium,
+            database_type: BenchDataBaseType::RocksDb,
+        },
+        ConstructionBenchmarkDescription {
+            key_types: KeyTypes::Sr25519,
+            block_type: BlockType::RandomTransfersKeepAlive,
+            size: SizeType::Large,
+            database_type: BenchDataBaseType::RocksDb,
+        },
+        PoolBenchmarkDescription { database_type: BenchDataBaseType::RocksDb },
+    );
 
-	if opt.list {
-		println!("Available benchmarks:");
-		if let Some(filter) = opt.filter.as_ref() {
-			println!("\t(filtered by \"{}\")", filter);
-		}
-		for benchmark in benchmarks.iter() {
-			if opt.filter.as_ref().map(|f| benchmark.path().has(f)).unwrap_or(true) {
-				println!("{}: {}", benchmark.name(), benchmark.path().full())
-			}
-		}
-		return
-	}
+    if opt.list {
+        println!("Available benchmarks:");
+        if let Some(filter) = opt.filter.as_ref() {
+            println!("\t(filtered by \"{}\")", filter);
+        }
+        for benchmark in benchmarks.iter() {
+            if opt
+                .filter
+                .as_ref()
+                .map(|f| benchmark.path().has(f))
+                .unwrap_or(true)
+            {
+                println!("{}: {}", benchmark.name(), benchmark.path().full())
+            }
+        }
+        return;
+    }
 
-	let mut results = Vec::new();
-	for benchmark in benchmarks {
-		if opt.filter.as_ref().map(|f| benchmark.path().has(f)).unwrap_or(true) {
-			log::info!("Starting {}", benchmark.name());
-			let result = run_benchmark(benchmark, opt.mode);
-			log::info!("{}", result);
+    let mut results = Vec::new();
+    for benchmark in benchmarks {
+        if opt
+            .filter
+            .as_ref()
+            .map(|f| benchmark.path().has(f))
+            .unwrap_or(true)
+        {
+            log::info!("Starting {}", benchmark.name());
+            let result = run_benchmark(benchmark, opt.mode);
+            log::info!("{}", result);
 
-			results.push(result);
-		}
-	}
+            results.push(result);
+        }
+    }
 
-	if results.is_empty() {
-		eprintln!("No benchmark was found for query");
-		std::process::exit(1);
-	}
+    if results.is_empty() {
+        eprintln!("No benchmark was found for query");
+        std::process::exit(1);
+    }
 
-	if opt.json {
-		let json_result: String =
-			serde_json::to_string(&results).expect("Failed to construct json");
-		println!("{}", json_result);
-	}
+    if opt.json {
+        let json_result: String =
+            serde_json::to_string(&results).expect("Failed to construct json");
+        println!("{}", json_result);
+    }
 }

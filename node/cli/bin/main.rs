@@ -23,5 +23,5 @@
 use rollup_node_cli as node_cli;
 
 fn main() -> sc_cli::Result<()> {
-	node_cli::run()
+    node_cli::run()
 }
