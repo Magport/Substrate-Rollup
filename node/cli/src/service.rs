@@ -25,8 +25,10 @@ use codec::Encode;
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 use frame_system_rpc_runtime_api::AccountNonceApi;
 use futures::prelude::*;
+use futures_timer::Delay;
 use node_executor::ExecutorDispatch;
-use node_primitives::Block;
+use node_primitives::{Block, BlockNumber};
+use parking_lot::RwLock;
 use rollup_runtime::RuntimeApi;
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_babe::{self, SlotProportion};
@@ -680,8 +682,11 @@ pub fn new_full_base(
 pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceError> {
     let mixnet_config = cli.mixnet_params.config(config.role.is_authority());
     let database_source = config.database.clone();
-    let task_manager = new_full_base(config, mixnet_config, cli.no_hardware_benchmarks, |_, _| ())
-        .map(|NewFullBase { task_manager, .. }| task_manager)?;
+    let NewFullBase {
+        task_manager,
+        client,
+        ..
+    } = new_full_base(config, mixnet_config, cli.no_hardware_benchmarks, |_, _| ())?;
 
     sc_storage_monitor::StorageMonitorService::try_spawn(
         cli.storage_monitor,
@@ -689,6 +694,46 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
         &task_manager.spawn_essential_handle(),
     )
     .map_err(|e| ServiceError::Application(e.into()))?;
+
+    log::info!("test!");
+    let submit_state = Arc::new(RwLock::new(BlockNumber::from(0u32)));
+
+    let submit_state_clone = submit_state.clone();
+    task_manager
+        .spawn_essential_handle()
+        .spawn("query-blocks-for-submit", "magport", {
+            let client = client.clone();
+            async move {
+                loop {
+                    Delay::new(std::time::Duration::from_secs(1)).await;
+                    let finalized_block_number = client.chain_info().finalized_number;
+                    {
+                        let mut write_guard = submit_state_clone.write();
+                        *write_guard = finalized_block_number;
+                        log::info!("Query Part: writing submit state: {:?}", write_guard);
+                    }
+                }
+            }
+        });
+
+    task_manager
+        .spawn_essential_handle()
+        .spawn("submit-blocks", "magport", {
+            async move {
+                loop {
+                    Delay::new(std::time::Duration::from_secs(1)).await;
+                    let latest_finalized_block_number;
+                    {
+                        let submit_state_guard = submit_state.read();
+                        latest_finalized_block_number = (*submit_state_guard).clone();
+                    }
+                    log::info!(
+                        "Submit Part: reading submit state: {:?}",
+                        latest_finalized_block_number
+                    );
+                }
+            }
+        });
 
     Ok(task_manager)
 }
