@@ -738,7 +738,7 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
                             log::info!("Query Part: writing block number: {:?}", write_guard);
                         } else {
                             log::info!(
-                                "Query Part: last_submitted_block_number: {:?} finalized_block_number: {:?} nothing to commit.",
+                                "Query Part: start_block_number: {:?} finalized_block_number: {:?} nothing to commit.",
                                 start_block_number,
                                 finalized_block_number
                             );
@@ -767,7 +767,7 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
                         continue;
                     }
 
-                    // Update arc_last_submitted_block, assume each time submit a block.
+                    // Update arc_last_submitted_block, assume each time will submit all block data in `blocks_waiting_for_submit` to Avail.
                     {
                         let mut write_guard = arc_last_submitted_block.write();
                         if let Some(block_number) = blocks_waiting_for_submit.last() {
