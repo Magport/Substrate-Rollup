@@ -40,8 +40,8 @@ use sc_statement_store::Store as StatementStore;
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::ProvideRuntimeApi;
-use sp_core::crypto::Pair;
-use sp_runtime::{generic, traits::Block as BlockT, SaturatedConversion};
+use sp_core::{crypto::Pair, ConstU32};
+use sp_runtime::{generic, traits::Block as BlockT, BoundedVec, SaturatedConversion};
 use std::sync::Arc;
 
 /// The full client type definition.
@@ -695,10 +695,16 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
     )
     .map_err(|e| ServiceError::Application(e.into()))?;
 
-    log::info!("test!");
-    let submit_state = Arc::new(RwLock::new(BlockNumber::from(0u32)));
+    // let submit_state = Arc::new(RwLock::new(BlockNumber::from(0u32)));
 
-    let submit_state_clone = submit_state.clone();
+    type LastSubmittedBlockNumber = Option<BlockNumber>;
+    type BlockNumberCollection = BoundedVec<BlockNumber, ConstU32<100>>;
+
+    let arc_last_submitted_block = Arc::new(RwLock::new(LastSubmittedBlockNumber::default()));
+    let arc_block_numbers = Arc::new(RwLock::new(BlockNumberCollection::default()));
+
+    let arc_last_submitted_block_clone = arc_last_submitted_block.clone();
+    let arc_block_numbers_clone = arc_block_numbers.clone();
     task_manager
         .spawn_essential_handle()
         .spawn("query-blocks-for-submit", "magport", {
@@ -707,10 +713,36 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
                 loop {
                     Delay::new(std::time::Duration::from_secs(1)).await;
                     let finalized_block_number = client.chain_info().finalized_number;
+
+                    let start_block_number;
                     {
-                        let mut write_guard = submit_state_clone.write();
-                        *write_guard = finalized_block_number;
-                        log::info!("Query Part: writing submit state: {:?}", write_guard);
+                        let last_submitted_block_number_guard = arc_last_submitted_block_clone.read();
+                       
+                        start_block_number = match &*last_submitted_block_number_guard {
+                            Some(last_submitted_block_number) => {
+                                (*last_submitted_block_number).clone() + 1
+                            }
+                            None => 0u32,
+                        };
+                    }
+                    {
+                        let mut write_guard = arc_block_numbers_clone.write();
+                        write_guard.clear();
+
+                        if start_block_number <= finalized_block_number {
+                            for block_number in start_block_number..=finalized_block_number {
+                                if write_guard.try_push(block_number).is_err() {
+                                    break;
+                                }
+                            }
+                            log::info!("Query Part: writing block number: {:?}", write_guard);
+                        } else {
+                            log::info!(
+                                "Query Part: last_submitted_block_number: {:?} finalized_block_number: {:?} nothing to commit.",
+                                start_block_number,
+                                finalized_block_number
+                            );
+                        }
                     }
                 }
             }
@@ -722,15 +754,30 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
             async move {
                 loop {
                     Delay::new(std::time::Duration::from_secs(1)).await;
-                    let latest_finalized_block_number;
+                    let blocks_waiting_for_submit;
                     {
-                        let submit_state_guard = submit_state.read();
-                        latest_finalized_block_number = (*submit_state_guard).clone();
+                        let arc_block_numbers_guard = arc_block_numbers.read();
+                        blocks_waiting_for_submit = (*arc_block_numbers_guard).clone();
                     }
                     log::info!(
-                        "Submit Part: reading submit state: {:?}",
-                        latest_finalized_block_number
+                        "Submit Part: reading blocks_waiting_for_submit: {:?}",
+                        blocks_waiting_for_submit
                     );
+                    if blocks_waiting_for_submit.is_empty() {
+                        continue;
+                    }
+
+                    // Update arc_last_submitted_block, assume each time submit a block.
+                    {
+                        let mut write_guard = arc_last_submitted_block.write();
+                        if let Some(block_number) = blocks_waiting_for_submit.last() {
+                            *write_guard = Some(block_number.clone());
+                        }
+                        log::info!(
+                            "Submit Part: writing arc_last_submitted_block: {:?}",
+                            *write_guard
+                        );
+                    }
                 }
             }
         });
