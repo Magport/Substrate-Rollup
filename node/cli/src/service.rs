@@ -695,8 +695,6 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
     )
     .map_err(|e| ServiceError::Application(e.into()))?;
 
-    // let submit_state = Arc::new(RwLock::new(BlockNumber::from(0u32)));
-
     type LastSubmittedBlockNumber = Option<BlockNumber>;
     type BlockNumberCollection = BoundedVec<BlockNumber, ConstU32<100>>;
 
@@ -717,7 +715,6 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
                     let start_block_number;
                     {
                         let last_submitted_block_number_guard = arc_last_submitted_block_clone.read();
-                       
                         start_block_number = match &*last_submitted_block_number_guard {
                             Some(last_submitted_block_number) => {
                                 (*last_submitted_block_number).clone() + 1
