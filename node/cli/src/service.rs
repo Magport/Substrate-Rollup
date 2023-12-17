@@ -40,10 +40,10 @@ use sc_statement_store::Store as StatementStore;
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::ProvideRuntimeApi;
-use sp_core::{crypto::Pair, ConstU32};
+use sp_core::{crypto::Pair, ConstU32, H256};
+use sp_keyring::AccountKeyring;
 use sp_runtime::{generic, traits::Block as BlockT, BoundedVec, SaturatedConversion};
-use std::sync::Arc;
-
+use std::{collections::HashMap, sync::Arc};
 /// The full client type definition.
 pub type FullClient =
     sc_service::TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<ExecutorDispatch>>;
@@ -698,8 +698,17 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
     type LastSubmittedBlockNumber = Option<BlockNumber>;
     type BlockNumberCollection = BoundedVec<BlockNumber, ConstU32<100>>;
 
+    type MagportBlockNumberAvailBlockHashMap = HashMap<BlockNumber, H256>;
+    type LastObtainedBlockNumber = Option<BlockNumber>;
+
     let arc_last_submitted_block = Arc::new(RwLock::new(LastSubmittedBlockNumber::default()));
     let arc_block_numbers = Arc::new(RwLock::new(BlockNumberCollection::default()));
+    let magport_avail_hash_map =
+        Arc::new(RwLock::new(MagportBlockNumberAvailBlockHashMap::default()));
+    let arc_last_obtained_block = Arc::new(RwLock::new(LastObtainedBlockNumber::default()));
+
+    let client = avail_subxt::build_client("ws://127.0.0.1:9945", false);
+
 
     let arc_last_submitted_block_clone = arc_last_submitted_block.clone();
     let arc_block_numbers_clone = arc_block_numbers.clone();
@@ -712,16 +721,118 @@ pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceE
                     Delay::new(std::time::Duration::from_secs(1)).await;
                     let finalized_block_number = client.chain_info().finalized_number;
 
-                    let start_block_number;
+                    // let start_block_number;
+                    // {
+                    //     let last_submitted_block_number_guard = arc_last_submitted_block_clone.read();
+                    //     start_block_number = match &*last_submitted_block_number_guard {
+                    //         Some(last_submitted_block_number) => {
+                    //             (*last_submitted_block_number).clone() + 1
+                    //         }
+                    //         None => 0u32,
+                    //     };
+                    // }
+
+                    // TODO: Do Avail Query Check Here. From LastObtainedBlockNumber to LastSubmittedBlockNumber.
+                    // TODO: If Avail Query Success, then update LastObtainedBlockNumber.
+                    // TODO: arc_block_numbers is from LastObtainedBlockNumber + 1 to FinalizedBlockNumber.
+
+                    // read arc_last_obtained_block
+                    let last_obtained_block_number;
                     {
-                        let last_submitted_block_number_guard = arc_last_submitted_block_clone.read();
-                        start_block_number = match &*last_submitted_block_number_guard {
-                            Some(last_submitted_block_number) => {
-                                (*last_submitted_block_number).clone() + 1
+                        let last_obtained_block_number_guard = arc_last_obtained_block.read();
+                        last_obtained_block_number = match &*last_obtained_block_number_guard {
+                            Some(last_obtained_block_number) => {
+                                (*last_obtained_block_number).clone()
                             }
                             None => 0u32,
                         };
                     }
+
+                    // read arc_last_submitted_block_clone
+                    let last_submitted_block_number;
+                    {
+                        let last_submitted_block_number_guard = arc_last_submitted_block_clone.read();
+                        last_submitted_block_number = match &*last_submitted_block_number_guard {
+                            Some(last_submitted_block_number) => {
+                                (*last_submitted_block_number).clone()
+                            }
+                            None => 0u32,
+                        };
+                    }
+
+                    // Do the Avail Query Check: Iterate from LastObtainedBlockNumber + 1 to LastSubmittedBlockNumber
+                    // If Avail Query Success, then update LastObtainedBlockNumber.
+
+                    if last_obtained_block_number < last_submitted_block_number {
+                        for block_number in last_obtained_block_number + 1..=last_submitted_block_number {
+                            // Query the block hash from MagportBlockNumberAvailBlockHashMap
+                            let block_hash;
+                            {
+                                let magport_avail_hash_map_guard = magport_avail_hash_map.read();
+                                magport_avail_hash_map_guard.get(&block_number);
+                            }
+
+                            if let Some(block_hash) = block_hash {
+                                let submitted_block = client.rpc().block(Some(block_hash)).await?.unwrap();
+                                
+                                let matched_xt = submitted_block
+                                    .block
+                                    .extrinsics
+                                    .into_iter()
+                                    .filter_map(|chain_block_ext| {
+                                    AppUncheckedExtrinsic::try_from(chain_block_ext)
+                                        .map(|ext| ext)
+                                        .ok()
+                                    })
+                                    .filter_map(|extrinsic| {
+                                        if let Some(signature) = extrinsic.signature {
+                                            // Data from extrinsic
+                                            let sender = signature.0;
+                                            let app_id = signature.2.app_id.0;
+
+                                            // Data you want to filter with
+                                            let filter_account: MultiAddress<subxt::utils::AccountId32, u32> = MultiAddress::Id(
+                                            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY" // TODO: Put the address filter here
+                                                .parse()
+                                                .unwrap(),
+                                            );
+                                            let filter_app_id: u32 = 1; // TODO: Put your app_id here
+
+                                            if sender == filter_account && app_id == filter_app_id {
+                                                Some(extrinsic.function)
+                                            } else {
+                                                None
+                                            }
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .find(|call| match call {
+                                    Call::DataAvailability(da_call) => match da_call {
+                                        DaCall::submit_data { data } => {
+                                            println!("{}", data.0)
+                                            // TODO: parse the data and get magport sent block number.
+                                        },
+                                        _ => false,
+                                    },
+                                    _ => false,
+                                    });
+
+                            }
+                        }
+                    }
+
+                    let start_block_number;
+                    {
+                        let last_obtained_block_number_guard = arc_last_obtained_block.read();
+                        last_obtained_block_number = match &*last_obtained_block_number_guard {
+                            Some(last_obtained_block_number) => {
+                                (*last_obtained_block_number).clone() + 1
+                            }
+                            None => 0u32,
+                        };
+                    }
+
                     {
                         let mut write_guard = arc_block_numbers_clone.write();
                         write_guard.clear();
