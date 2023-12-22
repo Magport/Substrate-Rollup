@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "node",
+    "pallets/template",
+    "primitives",
+    "runtime",
+]
+resolver = "2"
+
+[profile.release]
+panic = "unwind"
+
+[workspace.package]
+authors = ["Magport/Substrate-Rollup team"]
+edition = "2021"
+license = "Apache License 2.0"
+repository = "https://github.com/Magport/Substrate-Rollup"
