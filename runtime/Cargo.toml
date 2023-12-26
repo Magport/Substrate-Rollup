@@ -67,7 +67,8 @@ node-primitives = { version = "2.0.0", git = "https://github.com/paritytech/subs
 
 # Local Dependencies
 pallet-template = { version = "4.0.0-dev", default-features = false, path = "../pallets/template" }
-
+pallet-avail= { version = "0.0.1", default-features = false, path = "../pallets/avail" }
+primitives-avail = { path = "../primitives/avail", default-features = false }
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", optional = true , branch = "polkadot-v1.0.0" }
 
@@ -117,6 +118,7 @@ std = [
 	"sp-transaction-pool/std",
 	"sp-version/std",
 	"substrate-wasm-builder",
+	"primitives-avail/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

@@ -80,10 +80,16 @@ frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/pari
 # Local Dependencies
 node-template-runtime = { version = "4.0.0-dev", path = "../runtime" }
 node-primitives = { version = "2.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0", default-features = false }
-
+primitives-avail = { path = "../primitives/avail"}
 # CLI-specific dependencies
 try-runtime-cli = { version = "0.10.0-dev", optional = true, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 
+## Avail
+avail-subxt = { git = "https://github.com/availproject/avail", version = "0.4.0", tag = "v1.8.0.0" }
+subxt = "0.29"
+anyhow = "1.0.75"
+futures-timer = "3.0"
+codec = { package = "parity-scale-codec", version = "3.6.1" }
 [build-dependencies]
 substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 

@@ -73,9 +73,9 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
+pub use pallet_avail;
 /// Import the template pallet.
 pub use pallet_template;
-
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -369,8 +369,8 @@ impl Get<Option<BalancingConfig>> for OffchainRandomBalancing {
 			max => {
 				let seed = sp_io::offchain::random_seed();
 				let random = <u32>::decode(&mut TrailingZeroInput::new(&seed))
-					.expect("input is padded with zeroes; qed")
-					% max.saturating_add(1);
+					.expect("input is padded with zeroes; qed") %
+					max.saturating_add(1);
 				random as usize
 			},
 		};
@@ -639,6 +639,10 @@ impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_template::weights::SubstrateWeight<Runtime>;
 }
+impl pallet_avail::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -664,6 +668,7 @@ construct_runtime!(
 		Historical: pallet_session::historical::{Pallet},
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		AvailPallet:pallet_avail,
 	}
 );
 
@@ -924,7 +929,15 @@ impl_runtime_apis! {
 			TransactionPayment::length_to_fee(length)
 		}
 	}
+	impl primitives_avail::AvailRuntimeApi<Block> for Runtime {
 
+		fn last_submit_block_confirm()-> u32{
+			AvailPallet::last_submit_block_confirm()
+		}
+		fn last_avail_scan_block()->u32 {
+			AvailPallet::last_avail_scan_block()
+		}
+	}
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn benchmark_metadata(extra: bool) -> (
