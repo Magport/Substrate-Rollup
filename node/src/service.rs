@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use primitives_avail::AvailRecord;
 use sc_client_api::BlockBackend;
 use sc_consensus_babe::SlotProportion;
 pub use sc_executor::NativeElseWasmExecutor;
@@ -21,10 +22,11 @@ use node_primitives::Block;
 use node_template_runtime::RuntimeApi;
 
 use crate::{
+	avail_task::{spawn_query_block_task, spawn_submit_block_task},
 	cli::Cli,
 	rpc::{create_full, BabeDeps, FullDeps, GrandpaDeps},
 };
-
+use futures::lock::Mutex;
 // Our native executor instance.
 pub struct ExecutorDispatch;
 
@@ -193,7 +195,12 @@ pub fn new_full_base(
 	let (block_import, grandpa_link, babe_link) = import_setup;
 
 	(with_startup_data)(&block_import, &babe_link);
-
+	let avail_record = Arc::new(Mutex::new(AvailRecord {
+		last_submit_block: 0,
+		last_submit_block_confirm: 0,
+		last_avail_scan_block: 0,
+		last_avail_scan_block_confirm: 0,
+	}));
 	if let sc_service::config::Role::Authority { .. } = &role {
 		let proposer = sc_basic_authorship::ProposerFactory::new(
 			task_manager.spawn_handle(),
@@ -229,8 +236,11 @@ pub fn new_full_base(
 							&*client_clone,
 							&parent,
 						)?;
+					// let avail_record_local = cloned_avail_record.lock().await;
+					// let block_number = avail_record_local.last_submit_block_confirm;
+					let avail = primitives_avail::AvailInherentDataProvider::new(0);
 
-					Ok((slot, timestamp, storage_proof))
+					Ok((slot, timestamp, storage_proof, avail))
 				}
 			},
 			force_authoring,
@@ -292,7 +302,8 @@ pub fn new_full_base(
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
-
+	spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
+	spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
 	network_starter.start_network();
 	Ok(NewFullBase {
 		task_manager,
@@ -406,7 +417,6 @@ pub fn new_partial(
 						*timestamp,
 						slot_duration,
 					);
-
 				Ok((slot, timestamp))
 			},
 			spawner: &task_manager.spawn_essential_handle(),
