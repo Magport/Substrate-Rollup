@@ -211,6 +211,8 @@ pub fn new_full_base(
 		);
 
 		let client_clone = client.clone();
+		let avail_record_clone = avail_record.clone();
+
 		let slot_duration = babe_link.config().slot_duration();
 		let babe_config = sc_consensus_babe::BabeParams {
 			keystore: keystore_container.keystore(),
@@ -222,6 +224,7 @@ pub fn new_full_base(
 			justification_sync_link: sync_service.clone(),
 			create_inherent_data_providers: move |parent, ()| {
 				let client_clone = client_clone.clone();
+				let avail_record_clone = avail_record_clone.clone();
 				async move {
 					let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 
@@ -236,9 +239,11 @@ pub fn new_full_base(
 							&*client_clone,
 							&parent,
 						)?;
-					// let avail_record_local = cloned_avail_record.lock().await;
-					// let block_number = avail_record_local.last_submit_block_confirm;
-					let avail = primitives_avail::AvailInherentDataProvider::new(0);
+					let avail_record_local = avail_record_clone.lock().await;
+					let last_submit_block_confirm = avail_record_local.last_submit_block_confirm;
+					log::info!("================create_inherent_data_providers: last_submit_block_confirm:{:?}", last_submit_block_confirm);
+					let avail =
+						primitives_avail::AvailInherentDataProvider::new(last_submit_block_confirm);
 
 					Ok((slot, timestamp, storage_proof, avail))
 				}

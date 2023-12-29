@@ -12,13 +12,14 @@ use avail_subxt::{
 	Call,
 };
 use codec::Decode;
-use futures::lock::Mutex;
+use futures::{lock::Mutex, StreamExt};
 use futures_timer::Delay;
 use primitives_avail::{AvailRecord, AvailRuntimeApi};
-use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf};
+use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf, BlockchainEvents};
 use sc_service::{error::Error as ServiceError, TaskManager};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
+use sp_consensus::BlockOrigin;
 use sp_runtime::{
 	generic,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
@@ -112,7 +113,8 @@ pub fn spawn_query_block_task<T, B>(
 ) -> Result<(), Box<dyn Error>>
 where
 	B: BlockT,
-	T: ProvideRuntimeApi<B>
+	T: BlockchainEvents<B>
+		+ ProvideRuntimeApi<B>
 		+ BlockOf
 		+ AuxStore
 		+ HeaderBackend<B>
@@ -138,9 +140,18 @@ where
 		async move {
 			let avail_client =
 				avail_subxt::build_client("ws://127.0.0.1:9945", false).await.unwrap();
-			loop {
+			let mut notification_st = client.import_notification_stream();
+			while let Some(notification) = notification_st.next().await {
 				//get Latest_finalized_block
+				if notification.origin != BlockOrigin::Own {
+					continue;
+				}
 				let latest_final_heght = client.info().finalized_number.into();
+				log::info!(
+					"================query block task working: latest_final_heght:{:?}",
+					latest_final_heght
+				);
+
 				let last_submit_block_confirm = {
 					let avail_record_local = avail_record.lock().await;
 					avail_record_local.last_submit_block_confirm
@@ -168,15 +179,14 @@ where
 				for block_number in last_avail_scan_block..=avail_latest_block_height {
 					log::info!("================search avail block:{:?}========", block_number);
 					for block_number_solo in last_submit_block_confirm + 1..=latest_final_heght {
-						let find_result = query_block_exist(
+						if let Ok(find_result) = query_block_exist(
 							&avail_client,
 							client.clone(),
 							block_number,
 							block_number_solo,
 						)
 						.await
-						.unwrap();
-						if find_result {
+						{
 							confirm_block_number = block_number_solo;
 							last_avail_scan_block = block_number;
 							log::info!(
@@ -184,15 +194,22 @@ where
 								block_number_solo,
 								find_result
 							);
+						} else {
+							log::info!(
+								"Query task DA Layer error : failed due to closed websocket connection"
+							)
 						}
 					}
 				}
 				{
 					let mut avail_record_local = avail_record.lock().await;
+					log::info!(
+						"================query latest_final_heght:{:?}========",
+						latest_final_heght
+					);
 					avail_record_local.last_submit_block_confirm = confirm_block_number;
 					avail_record_local.last_avail_scan_block_confirm = last_avail_scan_block;
 				}
-				Delay::new(std::time::Duration::from_secs(6)).await;
 			}
 		}
 	});
@@ -206,7 +223,8 @@ pub fn spawn_submit_block_task<T, B>(
 ) -> Result<(), Box<dyn Error>>
 where
 	B: BlockT,
-	T: ProvideRuntimeApi<B>
+	T: BlockchainEvents<B>
+		+ ProvideRuntimeApi<B>
 		+ BlockOf
 		+ AuxStore
 		+ HeaderBackend<B>
@@ -221,7 +239,13 @@ where
 		async move {
 			let avail_client =
 				avail_subxt::build_client("ws://127.0.0.1:9945", false).await.unwrap();
-			loop {
+			let mut notification_st = client.import_notification_stream();
+			while let Some(notification) = notification_st.next().await {
+				let block_number: u32 = (*notification.header.number()).into();
+				if notification.origin != BlockOrigin::Own || block_number % 10 != 0 {
+					continue;
+				}
+				log::info!("================submit block task working: {:?}", block_number);
 				let lastest_hash = client.info().best_hash;
 				let latest_final_heght = client.info().finalized_number.into();
 				// let bak_last_submit_block_confirm =
@@ -239,7 +263,7 @@ where
 					last_submit_block_confirm
 				);
 				log::info!("================last_submit_block:{:?}", last_submit_block);
-				log::info!("================latest_final_heght:{:?}", latest_final_heght);
+				log::info!("================submit latest_final_heght:{:?}", latest_final_heght);
 				// if last_submit_block_confirm < last_submit_block {
 				// 	Delay::new(std::time::Duration::from_secs(6)).await;
 				// 	continue;
@@ -271,7 +295,7 @@ where
 								),
 								Err(e) => {
 									log::info!(
-											"DA Layer error : failed due to closed websocket connection"
+											"Submit task DA Layer error : failed due to closed websocket connection"
 										)
 								},
 							};
@@ -285,7 +309,6 @@ where
 					let mut avail_record_local = avail_record.lock().await;
 					avail_record_local.last_submit_block = latest_final_heght;
 				}
-				Delay::new(std::time::Duration::from_secs(6)).await;
 			}
 		}
 	});
