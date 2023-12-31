@@ -1,8 +1,7 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use std::sync::Arc;
-
-use primitives_avail::AvailRecord;
+use primitives_avail::{AvailRecord, AvailRuntimeApi};
 use sc_client_api::BlockBackend;
 use sc_consensus_babe::SlotProportion;
 pub use sc_executor::NativeElseWasmExecutor;
@@ -15,6 +14,8 @@ use sc_service::{error::Error as ServiceError, Configuration, RpcHandlers, TaskM
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_runtime::traits::Block as BlockT;
+use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
 
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 
@@ -239,11 +240,16 @@ pub fn new_full_base(
 							&*client_clone,
 							&parent,
 						)?;
-					let avail_record_local = avail_record_clone.lock().await;
+					let mut avail_record_local = avail_record_clone.lock().await;
 					let last_submit_block_confirm = avail_record_local.last_submit_block_confirm;
+					let lastest_hash = client_clone.info().best_hash;
+					let storage_last_submit_block_confirm = client_clone.runtime_api().last_submit_block_confirm(lastest_hash).unwrap_or(0);
+					if last_submit_block_confirm < storage_last_submit_block_confirm {
+						avail_record_local.last_submit_block_confirm = storage_last_submit_block_confirm;
+					}
 					log::info!("================create_inherent_data_providers: last_submit_block_confirm:{:?}", last_submit_block_confirm);
 					let avail =
-						primitives_avail::AvailInherentDataProvider::new(last_submit_block_confirm);
+						primitives_avail::AvailInherentDataProvider::new(avail_record_local.last_submit_block_confirm);
 
 					Ok((slot, timestamp, storage_proof, avail))
 				}
@@ -307,8 +313,8 @@ pub fn new_full_base(
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
-	spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
-	spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
+	let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
+	let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
 	network_starter.start_network();
 	Ok(NewFullBase {
 		task_manager,

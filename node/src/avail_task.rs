@@ -126,9 +126,7 @@ where
 	<<B as BlockT>::Header as HeaderT>::Number: Into<u32>,
 {
 	task_manager.spawn_essential_handle().spawn("spawn_query_block", "magport", {
-		// let lastest_hash = client.info().best_hash;
-		// let bak_last_submit_block_confirm =
-		// 	client.runtime_api().last_submit_block_confirm(lastest_hash)?;
+		
 		// let bak_last_avail_scan_block =
 		// client.runtime_api().last_avail_scan_block(lastest_hash)?; let avail_record =
 		// Arc::new(Mutex::new(AvailRecord { 	// last_submit_block_confirm:
@@ -143,7 +141,8 @@ where
 			let mut notification_st = client.import_notification_stream();
 			while let Some(notification) = notification_st.next().await {
 				//get Latest_finalized_block
-				if notification.origin != BlockOrigin::Own {
+				let block_number: u32 = (*notification.header.number()).into();
+				if notification.origin != BlockOrigin::Own || block_number % 5 != 0 {
 					continue;
 				}
 				let latest_final_heght = client.info().finalized_number.into();
@@ -152,10 +151,17 @@ where
 					latest_final_heght
 				);
 
-				let last_submit_block_confirm = {
-					let avail_record_local = avail_record.lock().await;
-					avail_record_local.last_submit_block_confirm
-				};
+				// let last_submit_block_confirm = {
+				// 	let avail_record_local = avail_record.lock().await;
+				// 	avail_record_local.last_submit_block_confirm
+				// };
+				let lastest_hash = client.info().best_hash;
+				let last_submit_block_confirm = client.runtime_api().last_submit_block_confirm(lastest_hash).unwrap_or(0);
+				log::info!(
+					"================query task-last_submit_block_confirm:{:?}",
+					last_submit_block_confirm
+				);
+
 				let last_avail_scan_block_confirm = {
 					let avail_record_local = avail_record.lock().await;
 					avail_record_local.last_avail_scan_block_confirm
@@ -187,6 +193,9 @@ where
 						)
 						.await
 						{
+							if !find_result {
+								break;
+							}
 							confirm_block_number = block_number_solo;
 							last_avail_scan_block = block_number;
 							log::info!(
@@ -196,7 +205,8 @@ where
 							);
 						} else {
 							log::info!(
-								"Query task DA Layer error : failed due to closed websocket connection"
+								"Query task DA Layer error block_number: {:?} not found in DA Layer",
+								block_number
 							)
 						}
 					}
@@ -246,22 +256,22 @@ where
 					continue;
 				}
 				log::info!("================submit block task working: {:?}", block_number);
-				let lastest_hash = client.info().best_hash;
 				let latest_final_heght = client.info().finalized_number.into();
+				// let lastest_hash = client.info().best_hash;
 				// let bak_last_submit_block_confirm =
 				// 		client.runtime_api().last_submit_block_confirm(lastest_hash).unwrap();
 				let last_submit_block = {
 					let avail_record_local = avail_record.lock().await;
 					avail_record_local.last_submit_block
 				};
-				let last_submit_block_confirm = {
-					let avail_record_local = avail_record.lock().await;
-					avail_record_local.last_submit_block_confirm
-				};
-				log::info!(
-					"================last_submit_block_confirm:{:?}",
-					last_submit_block_confirm
-				);
+				// let last_submit_block_confirm = {
+				// 	let avail_record_local = avail_record.lock().await;
+				// 	avail_record_local.last_submit_block_confirm
+				// };
+				// log::info!(
+				// 	"================last_submit_block_confirm:{:?}",
+				// 	last_submit_block_confirm
+				// );
 				log::info!("================last_submit_block:{:?}", last_submit_block);
 				log::info!("================submit latest_final_heght:{:?}", latest_final_heght);
 				// if last_submit_block_confirm < last_submit_block {
@@ -293,7 +303,7 @@ where
 									block_number_solo,
 									i
 								),
-								Err(e) => {
+								Err(_e) => {
 									log::info!(
 											"Submit task DA Layer error : failed due to closed websocket connection"
 										)
