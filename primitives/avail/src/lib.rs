@@ -6,13 +6,17 @@ use sp_inherents::{Error, InherentData, InherentIdentifier};
 #[derive(Encode, Decode, sp_core::RuntimeDebug, Clone, PartialEq, TypeInfo)]
 pub struct AvailInherentDataProvider {
 	pub last_submit_block_confirm: u32,
+	pub last_submit_block: u32,
 }
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"availiht";
 
 #[cfg(feature = "std")]
 impl AvailInherentDataProvider {
-	pub fn new(block_number: u32) -> AvailInherentDataProvider {
-		AvailInherentDataProvider { last_submit_block_confirm: block_number }
+	pub fn new(
+		last_submit_block_confirm: u32,
+		last_submit_block: u32,
+	) -> AvailInherentDataProvider {
+		AvailInherentDataProvider { last_submit_block_confirm, last_submit_block }
 	}
 }
 
@@ -44,7 +48,8 @@ sp_api::decl_runtime_apis! {
 	#[api_version(2)]
 	pub trait AvailRuntimeApi
 	{
-		fn last_submit_block_confirm()-> u32;
-		fn last_avail_scan_block()->u32;
+		fn last_submit_block_confirm() -> u32;
+		fn last_submit_block() -> u32;
+		fn last_avail_scan_block() ->u32;
 	}
 }

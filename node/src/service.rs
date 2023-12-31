@@ -1,6 +1,5 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::sync::Arc;
 use primitives_avail::{AvailRecord, AvailRuntimeApi};
 use sc_client_api::BlockBackend;
 use sc_consensus_babe::SlotProportion;
@@ -13,9 +12,10 @@ use sc_rpc_api::DenyUnsafe;
 use sc_service::{error::Error as ServiceError, Configuration, RpcHandlers, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use sp_runtime::traits::Block as BlockT;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
+use sp_runtime::traits::Block as BlockT;
+use std::sync::Arc;
 
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 
@@ -243,13 +243,30 @@ pub fn new_full_base(
 					let mut avail_record_local = avail_record_clone.lock().await;
 					let last_submit_block_confirm = avail_record_local.last_submit_block_confirm;
 					let lastest_hash = client_clone.info().best_hash;
-					let storage_last_submit_block_confirm = client_clone.runtime_api().last_submit_block_confirm(lastest_hash).unwrap_or(0);
+					let storage_last_submit_block_confirm = client_clone
+						.runtime_api()
+						.last_submit_block_confirm(lastest_hash)
+						.unwrap_or(0);
 					if last_submit_block_confirm < storage_last_submit_block_confirm {
-						avail_record_local.last_submit_block_confirm = storage_last_submit_block_confirm;
+						log::info!("local struct last_submit_block_confirm: {:?} is smaller than storage_last_submit_block_confirm: {:?}, update local struct last_submit_block_confirm", last_submit_block_confirm, storage_last_submit_block_confirm);
+						avail_record_local.last_submit_block_confirm =
+							storage_last_submit_block_confirm;
 					}
-					log::info!("================create_inherent_data_providers: last_submit_block_confirm:{:?}", last_submit_block_confirm);
-					let avail =
-						primitives_avail::AvailInherentDataProvider::new(avail_record_local.last_submit_block_confirm);
+
+					// If Pallet Storage last_submit_block is larger than last_submit_block in AvailRecord struct.
+					// It means that other nodes have submitted blocks, and the last_submit_block in AvailRecord struct needs to be updated which can avoid submitting the same block.
+					let last_submit_block = avail_record_local.last_submit_block;
+					let storage_last_submit_block =
+						client_clone.runtime_api().last_submit_block(lastest_hash).unwrap_or(0);
+					if last_submit_block < storage_last_submit_block {
+						log::info!("local struct last_submit_block: {:?} is smaller than storage_last_submit_block: {:?}, update local struct last_submit_block", last_submit_block, storage_last_submit_block);
+						avail_record_local.last_submit_block = storage_last_submit_block;
+					}
+					log::info!("================create_inherent_data_providers: last_submit_block_confirm: {:?} last_submit_block: {:?}", avail_record_local.last_submit_block_confirm, avail_record_local.last_submit_block);
+					let avail = primitives_avail::AvailInherentDataProvider::new(
+						avail_record_local.last_submit_block_confirm,
+						avail_record_local.last_submit_block,
+					);
 
 					Ok((slot, timestamp, storage_proof, avail))
 				}
