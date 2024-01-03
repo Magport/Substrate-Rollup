@@ -95,17 +95,20 @@ where
 		None => Ok(false),
 	}
 }
-async fn get_avail_latest_height(
+
+async fn get_avail_latest_finalized_height(
 	avail_client: &OnlineClient<AvailConfig>,
 ) -> Result<u32, Box<dyn Error>> {
-	let op_head_block = avail_client.rpc().block(None).await?;
+	let latest_finalized_block_hash = avail_client.rpc().finalized_head().await?;
+	let op_finalized_block = avail_client.rpc().block(Some(latest_finalized_block_hash)).await?;
 	avail_client.offline();
-	if let Some(head_block) = op_head_block {
+	if let Some(head_block) = op_finalized_block {
 		Ok(head_block.block.header.number)
 	} else {
 		Ok(0)
 	}
 }
+
 pub fn spawn_query_block_task<T, B>(
 	client: Arc<T>,
 	task_manager: &TaskManager,
@@ -126,60 +129,61 @@ where
 	<<B as BlockT>::Header as HeaderT>::Number: Into<u32>,
 {
 	task_manager.spawn_essential_handle().spawn("spawn_query_block", "magport", {
-		// let bak_last_avail_scan_block =
-		// client.runtime_api().last_avail_scan_block(lastest_hash)?; let avail_record =
-		// Arc::new(Mutex::new(AvailRecord { 	// last_submit_block_confirm:
-		// bak_last_submit_block_confirm, 	// last_avail_scan_block: bak_last_avail_scan_block,
-		// 	last_submit_block:1,
-		// 	last_submit_block_confirm: 1,
-		// 	last_avail_scan_block: 1,
-		// }));
 		async move {
 			let avail_client =
 				avail_subxt::build_client("ws://127.0.0.1:9945", false).await.unwrap();
 			let mut notification_st = client.import_notification_stream();
 			while let Some(notification) = notification_st.next().await {
-				//get Latest_finalized_block
+				// Always update avail_record_local when new block is imported from Pallet Storage
+				let lastest_hash = client.info().best_hash;
+				let last_submit_block_confirm = client.runtime_api().last_submit_block_confirm(lastest_hash).unwrap();
+				let last_submit_block = client.runtime_api().last_submit_block(lastest_hash).unwrap();
+				{
+					let mut avail_record_local = avail_record.lock().await;
+					log::info!(
+						"================ before: last_submit_block_confirm:{:?} last_avail_scan_block_confirm:{:?} ================",
+						avail_record_local.last_submit_block_confirm,
+						avail_record_local.last_avail_scan_block_confirm
+					);
+					avail_record_local.last_submit_block_confirm = last_submit_block_confirm;
+					avail_record_local.last_submit_block = last_submit_block;
+				}
+
+				if last_submit_block_confirm == last_submit_block {
+					log::info!("================ last_submit_block_confirm == last_submit_block({:?}), no need to query DA Layer ================", last_submit_block_confirm);
+					continue;
+				}
+
 				let block_number: u32 = (*notification.header.number()).into();
 				if notification.origin != BlockOrigin::Own || block_number % 5 != 0 {
 					continue;
 				}
-				let latest_final_height = client.info().finalized_number.into();
-				log::info!(
-					"================query block task working: latest_final_height:{:?}",
-					latest_final_height
-				);
 
-				// let last_submit_block_confirm = {
-				// 	let avail_record_local = avail_record.lock().await;
-				// 	avail_record_local.last_submit_block_confirm
-				// };
-				let lastest_hash = client.info().best_hash;
-				let last_submit_block_confirm =
-					client.runtime_api().last_submit_block_confirm(lastest_hash).unwrap_or(0);
-				log::info!(
-					"================query task-last_submit_block_confirm:{:?}",
-					last_submit_block_confirm
-				);
-
-				let last_avail_scan_block_confirm = {
+				let (last_submit_block_confirm, last_submit_block, last_avail_scan_block_confirm) = {
 					let avail_record_local = avail_record.lock().await;
-					avail_record_local.last_avail_scan_block_confirm
+					(avail_record_local.last_submit_block_confirm, avail_record_local.last_submit_block, avail_record_local.last_avail_scan_block_confirm)
 				};
-				// query solochain block is exist in avail
-				let avail_latest_block_height =
-					get_avail_latest_height(&avail_client).await.unwrap();
+				log::info!(
+					"================ after: last_submit_block_confirm:{:?} last_submit_block:{:?} ================",
+					last_submit_block_confirm,
+					last_submit_block
+				);
+				let avail_latest_finalized_height = get_avail_latest_finalized_height(&avail_client).await.unwrap();
 				log::info!(
 					"================ Avail Block Query Range: {:?} to {:?} ================",
 					last_avail_scan_block_confirm,
-					avail_latest_block_height
+					avail_latest_finalized_height
 				);
+				if last_avail_scan_block_confirm == avail_latest_finalized_height {
+					log::info!("================ Avail's Finalized Block is the same as last_avail_scan_block_confirm, no need to query DA Layer ================");
+					continue;
+				}
 
 				let mut confirm_block_number = last_submit_block_confirm;
 				let mut last_avail_scan_block = last_avail_scan_block_confirm;
-				for block_number in last_avail_scan_block_confirm..=avail_latest_block_height {
-					log::info!("================search avail block:{:?}========", block_number);
-					for block_number_solo in last_submit_block_confirm + 1..=latest_final_height {
+				for block_number in last_avail_scan_block_confirm..=avail_latest_finalized_height {
+					log::info!("================ search avail block:{:?} ================", block_number);
+					for block_number_solo in last_submit_block_confirm + 1..=last_submit_block {
 						if let Ok(find_result) = query_block_exist(
 							&avail_client,
 							client.clone(),
@@ -208,12 +212,26 @@ where
 				}
 				{
 					let mut avail_record_local = avail_record.lock().await;
-					log::info!(
-						"================query latest_final_height:{:?}========",
-						latest_final_height
-					);
-					avail_record_local.last_submit_block_confirm = confirm_block_number;
-					avail_record_local.last_avail_scan_block_confirm = last_avail_scan_block;
+					if confirm_block_number < last_submit_block {
+						avail_record_local.last_submit_block_confirm = confirm_block_number;
+						avail_record_local.last_avail_scan_block_confirm = last_avail_scan_block;
+						avail_record_local.last_submit_block = confirm_block_number;
+						log::info!(
+							"================ MISS BLOCK: {:?}, RESUBMIT: {:?}, last_submit_block_confirm: {:?} last_avail_scan_block_confirm: {:?} ================",
+							confirm_block_number+1,
+							avail_record_local.last_submit_block,
+							avail_record_local.last_submit_block_confirm,
+							avail_record_local.last_avail_scan_block_confirm
+						);
+					} else {
+						avail_record_local.last_submit_block_confirm = confirm_block_number;
+						avail_record_local.last_avail_scan_block_confirm = last_avail_scan_block;
+						log::info!(
+							"================ ALL Blocks Founded IN AVAIL: last_submit_block_confirm:{:?} last_avail_scan_block_confirm:{:?} ================",
+							avail_record_local.last_submit_block_confirm,
+							avail_record_local.last_avail_scan_block_confirm
+						);
+					}
 				}
 			}
 		}
@@ -246,11 +264,30 @@ where
 				avail_subxt::build_client("ws://127.0.0.1:9945", false).await.unwrap();
 			let mut notification_st = client.import_notification_stream();
 			while let Some(notification) = notification_st.next().await {
+				// Always update avail_record_local when new block is imported from Pallet Storage
+				let lastest_hash = client.info().best_hash;
+				let last_submit_block_confirm = client.runtime_api().last_submit_block_confirm(lastest_hash).unwrap();
+				let last_submit_block = client.runtime_api().last_submit_block(lastest_hash).unwrap();
+				{
+					let mut avail_record_local = avail_record.lock().await;
+					log::info!(
+						"================ before: last_submit_block_confirm:{:?} last_avail_scan_block_confirm:{:?} ================",
+						avail_record_local.last_submit_block_confirm,
+						avail_record_local.last_avail_scan_block_confirm
+					);
+					avail_record_local.last_submit_block_confirm = last_submit_block_confirm;
+					avail_record_local.last_submit_block = last_submit_block;
+				}
+				if last_submit_block_confirm != last_submit_block {
+					log::info!("================ Waiting Query Confirm Until last_submit_block_confirm: {:?} Equal To last_submit_block: {:?}, no need to submit to DA Layer ================", last_submit_block_confirm, last_submit_block);
+					continue;
+				}
+
 				let block_number: u32 = (*notification.header.number()).into();
 				if notification.origin != BlockOrigin::Own || block_number % 10 != 0 {
 					continue;
 				}
-				log::info!("================submit block task working: {:?}", block_number);
+				log::info!("================ submit block task working: {:?} ================", block_number);
 				let latest_final_height = client.info().finalized_number.into();
 				// let lastest_hash = client.info().best_hash;
 				// let bak_last_submit_block_confirm =
@@ -259,8 +296,8 @@ where
 					let avail_record_local = avail_record.lock().await;
 					avail_record_local.last_submit_block
 				};
-				log::info!("================last_submit_block:{:?}", last_submit_block);
-				log::info!("================submit latest_final_height:{:?}", latest_final_height);
+				log::info!("================ after: last_submit_block:{:?} ================", last_submit_block);
+				log::info!("================ submit latest_final_height:{:?} ================", latest_final_height);
 				for block_number_solo in last_submit_block + 1..=latest_final_height {
 					let rollup_block_hash =
 						client.block_hash(block_number_solo.into()).unwrap().unwrap();
@@ -282,7 +319,7 @@ where
 								.await
 							{
 								Ok(i) => log::info!(
-									"================submit block:{:?},hash:{:?}",
+									"================ submit block:{:?},hash:{:?} ================",
 									block_number_solo,
 									i
 								),
