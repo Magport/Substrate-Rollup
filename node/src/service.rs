@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use primitives_avail::{AvailRecord, AvailRuntimeApi};
+use primitives_avail::AvailRecord;
 use sc_client_api::BlockBackend;
 use sc_consensus_babe::SlotProportion;
 pub use sc_executor::NativeElseWasmExecutor;
@@ -12,8 +12,7 @@ use sc_rpc_api::DenyUnsafe;
 use sc_service::{error::Error as ServiceError, Configuration, RpcHandlers, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use sp_api::ProvideRuntimeApi;
-use sp_blockchain::HeaderBackend;
+
 use sp_runtime::traits::Block as BlockT;
 use std::sync::Arc;
 

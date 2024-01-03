@@ -13,17 +13,15 @@ use avail_subxt::{
 };
 use codec::Decode;
 use futures::{lock::Mutex, StreamExt};
-use futures_timer::Delay;
+
 use primitives_avail::{AvailRecord, AvailRuntimeApi};
 use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf, BlockchainEvents};
-use sc_service::{error::Error as ServiceError, TaskManager};
+use sc_service::{TaskManager};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::BlockOrigin;
 use sp_runtime::{
-	generic,
-	traits::{Block as BlockT, Header as HeaderT, NumberFor},
-	SaturatedConversion,
+	traits::{Block as BlockT, Header as HeaderT},
 };
 use std::{error::Error, sync::Arc};
 use subxt::{rpc::types::BlockNumber, OnlineClient};
@@ -69,7 +67,7 @@ where
 			Call::DataAvailability(da_call) => match da_call {
 				DaCall::submit_data { data } => {
 					// log::info!("=======get:{:?}", data);
-					let rollup_block = node_template_runtime::Block::decode(&mut &data.0[..]);
+					let _rollup_block = node_template_runtime::Block::decode(&mut &data.0[..]);
 					// log::info!("=======get block:{:?}", rollup_block);
 					let rollup_block_hash = client.block_hash(block_number_solo.into());
 					let mut find_flag = false;
