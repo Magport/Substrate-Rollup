@@ -7,6 +7,7 @@ use sp_inherents::{Error, InherentData, InherentIdentifier};
 pub struct AvailInherentDataProvider {
 	pub last_submit_block_confirm: u32,
 	pub last_submit_block: u32,
+	pub awaiting_inherent_processing: bool,
 }
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"availiht";
 
@@ -15,8 +16,13 @@ impl AvailInherentDataProvider {
 	pub fn new(
 		last_submit_block_confirm: u32,
 		last_submit_block: u32,
+		awaiting_inherent_processing: bool,
 	) -> AvailInherentDataProvider {
-		AvailInherentDataProvider { last_submit_block_confirm, last_submit_block }
+		AvailInherentDataProvider {
+			last_submit_block_confirm,
+			last_submit_block,
+			awaiting_inherent_processing,
+		}
 	}
 }
 
@@ -26,6 +32,7 @@ pub struct AvailRecord {
 	pub last_submit_block_confirm: u32,
 	pub last_avail_scan_block: u32,
 	pub last_avail_scan_block_confirm: u32,
+	pub awaiting_inherent_processing: bool,
 }
 
 #[cfg(feature = "std")]

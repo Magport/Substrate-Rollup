@@ -22,7 +22,7 @@ use node_primitives::Block;
 use node_template_runtime::RuntimeApi;
 
 use crate::{
-	avail_task::{spawn_query_block_task, spawn_submit_block_task},
+	avail_task::spawn_avail_task,
 	cli::Cli,
 	rpc::{create_full, BabeDeps, FullDeps, GrandpaDeps},
 };
@@ -200,6 +200,7 @@ pub fn new_full_base(
 		last_submit_block_confirm: 0,
 		last_avail_scan_block: 0,
 		last_avail_scan_block_confirm: 0,
+		awaiting_inherent_processing: false,
 	}));
 	if let sc_service::config::Role::Authority { .. } = &role {
 		let proposer = sc_basic_authorship::ProposerFactory::new(
@@ -240,40 +241,18 @@ pub fn new_full_base(
 							&parent,
 						)?;
 
-					let (last_submit_block_confirm, last_submit_block) = {
+					let (
+						last_submit_block_confirm,
+						last_submit_block,
+						awaiting_inherent_processing,
+					) = {
 						let avail_record_local = avail_record_clone.lock().await;
 						(
 							avail_record_local.last_submit_block_confirm,
 							avail_record_local.last_submit_block,
+							avail_record_local.awaiting_inherent_processing,
 						)
 					};
-					// let mut avail_record_local = avail_record_clone.lock().await;
-					// let last_submit_block_confirm = avail_record_local.last_submit_block_confirm;
-					// let lastest_hash = client_clone.info().best_hash;
-					// let storage_last_submit_block_confirm = client_clone
-					// 	.runtime_api()
-					// 	.last_submit_block_confirm(lastest_hash)
-					// 	.unwrap_or(0);
-					// if last_submit_block_confirm < storage_last_submit_block_confirm {
-					// 	log::info!("local struct last_submit_block_confirm: {:?} is smaller than
-					// storage_last_submit_block_confirm: {:?}, update local struct
-					// last_submit_block_confirm", last_submit_block_confirm,
-					// storage_last_submit_block_confirm); 	avail_record_local.
-					// last_submit_block_confirm = 		storage_last_submit_block_confirm;
-					// }
-
-					// // If Pallet Storage last_submit_block is larger than last_submit_block in
-					// // AvailRecord struct. It means that other nodes have submitted blocks, and
-					// the // last_submit_block in AvailRecord struct needs to be updated which can
-					// avoid // submitting the same block.
-					// let last_submit_block = avail_record_local.last_submit_block;
-					// let storage_last_submit_block =
-					// 	client_clone.runtime_api().last_submit_block(lastest_hash).unwrap_or(0);
-					// if last_submit_block < storage_last_submit_block {
-					// 	log::info!("local struct last_submit_block: {:?} is smaller than
-					// storage_last_submit_block: {:?}, update local struct last_submit_block",
-					// last_submit_block, storage_last_submit_block); 	avail_record_local.
-					// last_submit_block = storage_last_submit_block; }
 					log::info!(
 						"================ create_inherent_data_providers: last_submit_block_confirm: {:?} last_submit_block: {:?} ================",
 						last_submit_block_confirm,
@@ -282,8 +261,13 @@ pub fn new_full_base(
 					let avail = primitives_avail::AvailInherentDataProvider::new(
 						last_submit_block_confirm,
 						last_submit_block,
+						awaiting_inherent_processing,
 					);
 
+					{
+						let mut avail_record_local = avail_record_clone.lock().await;
+						avail_record_local.awaiting_inherent_processing = false;
+					}
 					Ok((slot, timestamp, storage_proof, avail))
 				}
 			},
@@ -346,8 +330,9 @@ pub fn new_full_base(
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
-	let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
-	let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
+	// let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
+	// let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
+	let _ = spawn_avail_task(client.clone(), &task_manager, avail_record.clone());
 	network_starter.start_network();
 	Ok(NewFullBase {
 		task_manager,

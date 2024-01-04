@@ -87,8 +87,10 @@ pub mod pallet {
 			data: primitives_avail::AvailInherentDataProvider,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
-			LastSubmitBlockConfirm::<T>::set(data.last_submit_block_confirm);
-			LastSubmitBlock::<T>::set(data.last_submit_block);
+			if data.awaiting_inherent_processing {
+				LastSubmitBlockConfirm::<T>::set(data.last_submit_block_confirm);
+				LastSubmitBlock::<T>::set(data.last_submit_block);
+			}
 			Ok(().into())
 		}
 	}
