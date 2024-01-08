@@ -35,6 +35,10 @@ pub mod pallet {
 	pub(super) type LastSubmitBlockConfirm<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn last_submit_block)]
+	pub(super) type LastSubmitBlock<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn last_avail_scan_block)]
 	pub(super) type LastAvailScanBlock<T: Config> = StorageValue<_, u32, ValueQuery>;
 
@@ -83,7 +87,10 @@ pub mod pallet {
 			data: primitives_avail::AvailInherentDataProvider,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
-			LastSubmitBlockConfirm::<T>::set(data.last_submit_block_confirm);
+			if data.awaiting_inherent_processing {
+				LastSubmitBlockConfirm::<T>::set(data.last_submit_block_confirm);
+				LastSubmitBlock::<T>::set(data.last_submit_block);
+			}
 			Ok(().into())
 		}
 	}

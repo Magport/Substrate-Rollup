@@ -934,6 +934,9 @@ impl_runtime_apis! {
 		fn last_submit_block_confirm()-> u32{
 			AvailPallet::last_submit_block_confirm()
 		}
+		fn last_submit_block()-> u32{
+			AvailPallet::last_submit_block()
+		}
 		fn last_avail_scan_block()->u32 {
 			AvailPallet::last_avail_scan_block()
 		}

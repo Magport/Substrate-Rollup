@@ -1,7 +1,5 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::sync::Arc;
-
 use primitives_avail::AvailRecord;
 use sc_client_api::BlockBackend;
 use sc_consensus_babe::SlotProportion;
@@ -14,7 +12,9 @@ use sc_rpc_api::DenyUnsafe;
 use sc_service::{error::Error as ServiceError, Configuration, RpcHandlers, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
+
 use sp_runtime::traits::Block as BlockT;
+use std::sync::Arc;
 
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 
@@ -22,7 +22,7 @@ use node_primitives::Block;
 use node_template_runtime::RuntimeApi;
 
 use crate::{
-	avail_task::{spawn_query_block_task, spawn_submit_block_task},
+	avail_task::spawn_avail_task,
 	cli::Cli,
 	rpc::{create_full, BabeDeps, FullDeps, GrandpaDeps},
 };
@@ -200,6 +200,7 @@ pub fn new_full_base(
 		last_submit_block_confirm: 0,
 		last_avail_scan_block: 0,
 		last_avail_scan_block_confirm: 0,
+		awaiting_inherent_processing: false,
 	}));
 	if let sc_service::config::Role::Authority { .. } = &role {
 		let proposer = sc_basic_authorship::ProposerFactory::new(
@@ -211,6 +212,8 @@ pub fn new_full_base(
 		);
 
 		let client_clone = client.clone();
+		let avail_record_clone = avail_record.clone();
+
 		let slot_duration = babe_link.config().slot_duration();
 		let babe_config = sc_consensus_babe::BabeParams {
 			keystore: keystore_container.keystore(),
@@ -222,6 +225,7 @@ pub fn new_full_base(
 			justification_sync_link: sync_service.clone(),
 			create_inherent_data_providers: move |parent, ()| {
 				let client_clone = client_clone.clone();
+				let avail_record_clone = avail_record_clone.clone();
 				async move {
 					let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 
@@ -236,10 +240,34 @@ pub fn new_full_base(
 							&*client_clone,
 							&parent,
 						)?;
-					// let avail_record_local = cloned_avail_record.lock().await;
-					// let block_number = avail_record_local.last_submit_block_confirm;
-					let avail = primitives_avail::AvailInherentDataProvider::new(0);
 
+					let (
+						last_submit_block_confirm,
+						last_submit_block,
+						awaiting_inherent_processing,
+					) = {
+						let avail_record_local = avail_record_clone.lock().await;
+						(
+							avail_record_local.last_submit_block_confirm,
+							avail_record_local.last_submit_block,
+							avail_record_local.awaiting_inherent_processing,
+						)
+					};
+					log::info!(
+						"================ create_inherent_data_providers: last_submit_block_confirm: {:?} last_submit_block: {:?} ================",
+						last_submit_block_confirm,
+						last_submit_block
+					);
+					let avail = primitives_avail::AvailInherentDataProvider::new(
+						last_submit_block_confirm,
+						last_submit_block,
+						awaiting_inherent_processing,
+					);
+
+					{
+						let mut avail_record_local = avail_record_clone.lock().await;
+						avail_record_local.awaiting_inherent_processing = false;
+					}
 					Ok((slot, timestamp, storage_proof, avail))
 				}
 			},
@@ -302,8 +330,9 @@ pub fn new_full_base(
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
-	spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
-	spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
+	// let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
+	// let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
+	let _ = spawn_avail_task(client.clone(), &task_manager, avail_record.clone());
 	network_starter.start_network();
 	Ok(NewFullBase {
 		task_manager,
