@@ -149,7 +149,7 @@ where
 				// Get Avail Client
 				let guard = avail_client.lock().await;
 				let avail_client_ref = guard.as_ref().unwrap();
-				
+
 				let block_number: u32 = (*notification.header.number()).into();
 				// Query
 				if block_number % 5 == 0 {
