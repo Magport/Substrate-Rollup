@@ -60,8 +60,9 @@ type FullGrandpaBlockImport =
 /// Builds a new service for a full client.
 pub fn new_full(config: Configuration, cli: Cli) -> Result<TaskManager, ServiceError> {
 	let database_source = config.database.clone();
-	let task_manager = new_full_base(config, cli.no_hardware_benchmarks, |_, _| ())
-		.map(|NewFullBase { task_manager, .. }| task_manager)?;
+	let task_manager =
+		new_full_base(config, cli.no_hardware_benchmarks, |_, _| (), cli.avail_rpc_port)
+			.map(|NewFullBase { task_manager, .. }| task_manager)?;
 
 	sc_storage_monitor::StorageMonitorService::try_spawn(
 		cli.storage_monitor,
@@ -97,6 +98,7 @@ pub fn new_full_base(
 		&sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
 		&sc_consensus_babe::BabeLink<Block>,
 	),
+	avail_rpc_port: Option<u16>,
 ) -> Result<NewFullBase, ServiceError> {
 	let hwbench = (!disable_hardware_benchmarks)
 		.then_some(config.database.path().map(|database_path| {
@@ -332,7 +334,7 @@ pub fn new_full_base(
 	}
 	// let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
 	// let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
-	let _ = spawn_avail_task(client.clone(), &task_manager, avail_record.clone());
+	let _ = spawn_avail_task(client.clone(), &task_manager, avail_record.clone(), avail_rpc_port);
 	network_starter.start_network();
 	Ok(NewFullBase {
 		task_manager,

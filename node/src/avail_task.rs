@@ -109,6 +109,7 @@ pub fn spawn_avail_task<T, B>(
 	client: Arc<T>,
 	task_manager: &TaskManager,
 	avail_record: Arc<Mutex<AvailRecord>>,
+	avail_rpc_port: Option<u16>,
 ) -> Result<(), Box<dyn Error>>
 where
 	B: BlockT,
@@ -126,15 +127,15 @@ where
 {
 	task_manager.spawn_essential_handle().spawn("spawn_query_block", "magport", {
 		async move {
+			let avail_url = format!("ws://127.0.0.1:{}", avail_rpc_port.unwrap_or(9945));
 			let avail_client =
-				avail_subxt::build_client("ws://127.0.0.1:9945", false).await.unwrap();
+				avail_subxt::build_client(&avail_url, false).await.unwrap();
 			let mut notification_st = client.import_notification_stream();
 			while let Some(notification) = notification_st.next().await {
 				if notification.origin != BlockOrigin::Own {
 					continue;
 				}
 				let block_number: u32 = (*notification.header.number()).into();
-
 				// Query
 				if block_number % 5 == 0 {
 					// Sync From Pallet

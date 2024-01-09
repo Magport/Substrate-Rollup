@@ -21,6 +21,9 @@ pub struct Cli {
 	#[allow(missing_docs)]
 	#[clap(flatten)]
 	pub storage_monitor: sc_storage_monitor::StorageMonitorParams,
+
+	/// Avail PRC Port Number, default is 9945.
+	pub avail_rpc_port: Option<u16>,
 }
 
 #[derive(Debug, clap::Subcommand)]
