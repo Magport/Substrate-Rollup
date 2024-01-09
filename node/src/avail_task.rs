@@ -109,7 +109,7 @@ pub fn spawn_avail_task<T, B>(
 	client: Arc<T>,
 	task_manager: &TaskManager,
 	avail_record: Arc<Mutex<AvailRecord>>,
-	avail_rpc_port: Option<u16>,
+	avail_rpc_port: u16,
 ) -> Result<(), Box<dyn Error>>
 where
 	B: BlockT,
@@ -127,14 +127,29 @@ where
 {
 	task_manager.spawn_essential_handle().spawn("spawn_query_block", "magport", {
 		async move {
-			let avail_url = format!("ws://127.0.0.1:{}", avail_rpc_port.unwrap_or(9945));
-			let avail_client =
-				avail_subxt::build_client(&avail_url, false).await.unwrap();
+			let avail_url = format!("ws://127.0.0.1:{}", avail_rpc_port);
+			log::info!("================ TASK | avail_url: {:?} ================", avail_url);
+			let avail_client = Arc::new(Mutex::new(None::<OnlineClient<AvailConfig>>));
 			let mut notification_st = client.import_notification_stream();
 			while let Some(notification) = notification_st.next().await {
 				if notification.origin != BlockOrigin::Own {
 					continue;
 				}
+				// If inner of avail_client is None, try to connect avail
+				if avail_client.lock().await.is_none() {
+					let avail_client_inner = avail_subxt::build_client(&avail_url, false).await;
+					if let Ok(avail_client_inner) = avail_client_inner {
+						*avail_client.lock().await = Some(avail_client_inner);
+						log::info!("================ TASK | avail service connected ================");
+					} else {
+						log::info!("================ TASK | avail service not connected ================");
+						continue;
+					}
+				}
+				// Get Avail Client
+				let guard = avail_client.lock().await;
+				let avail_client_ref = guard.as_ref().unwrap();
+				
 				let block_number: u32 = (*notification.header.number()).into();
 				// Query
 				if block_number % 5 == 0 {
@@ -168,7 +183,7 @@ where
 					};
 
 					if last_submit_block_confirm != last_submit_block {
-						let avail_latest_finalized_height = get_avail_latest_finalized_height(&avail_client).await.unwrap();
+						let avail_latest_finalized_height = get_avail_latest_finalized_height(avail_client_ref).await.unwrap();
 						log::info!(
 							"================ QUERY TASK | Avail Block Query Range: {:?} to {:?} ================",
 							last_avail_scan_block_confirm,
@@ -185,7 +200,7 @@ where
 							log::info!("================ QUERY TASK | search avail block:{:?} ================", block_number);
 							for block_number_solo in last_submit_block_confirm + 1..=last_submit_block {
 								if let Ok(find_result) = query_block_exist(
-									&avail_client,
+									avail_client_ref,
 									client.clone(),
 									block_number,
 									block_number_solo,
@@ -268,7 +283,7 @@ where
 								let extrinsic_params =
 									AvailExtrinsicParams::new_with_app_id(AppId(0u32));
 								let signer = signer_from_seed("//Alice").unwrap();
-								match avail_client
+								match avail_client_ref
 									.tx()
 									.sign_and_submit(&data_transfer, &signer, extrinsic_params)
 									.await
