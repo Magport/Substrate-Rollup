@@ -12,7 +12,7 @@ resolver = "2"
 panic = "unwind"
 
 [workspace.package]
-authors = ["Magport/Substrate-Rollup team"]
+authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>", "Magport/Substrate-Rollup team"]
 edition = "2021"
 license = "Apache License 2.0"
 repository = "https://github.com/Magport/Substrate-Rollup"

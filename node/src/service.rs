@@ -19,7 +19,7 @@ use std::sync::Arc;
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 
 use node_primitives::Block;
-use node_template_runtime::RuntimeApi;
+use magport_node_runtime::RuntimeApi;
 
 use crate::{
 	avail_task::spawn_avail_task,
@@ -39,11 +39,11 @@ impl sc_executor::NativeExecutionDispatch for ExecutorDispatch {
 	type ExtendHostFunctions = ();
 
 	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		node_template_runtime::api::dispatch(method, data)
+		magport_node_runtime::api::dispatch(method, data)
 	}
 
 	fn native_version() -> sc_executor::NativeVersion {
-		node_template_runtime::native_version()
+		magport_node_runtime::native_version()
 	}
 }
 
@@ -332,8 +332,6 @@ pub fn new_full_base(
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
-	// let _ = spawn_query_block_task(client.clone(), &task_manager, avail_record.clone());
-	// let _ = spawn_submit_block_task(client.clone(), &task_manager, avail_record.clone());
 	let _ = spawn_avail_task(client.clone(), &task_manager, avail_record.clone(), avail_rpc_port);
 	network_starter.start_network();
 	Ok(NewFullBase {

@@ -1,8 +1,8 @@
 [package]
-name = "node-template"
+name = "magport-node"
 version = "4.0.0-dev"
 description = "A fresh FRAME-based Substrate node, ready for hacking."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
+authors.workspace = true
 homepage = "https://substrate.io/"
 edition = "2021"
 license = "MIT-0"
@@ -12,9 +12,6 @@ build = "build.rs"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
-
-[[bin]]
-name = "node-template"
 
 [dependencies]
 clap = { version = "4.4.2", features = ["derive"] }
@@ -78,7 +75,7 @@ frame-benchmarking = { version = "4.0.0-dev", git = "https://github.com/parityte
 frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 
 # Local Dependencies
-node-template-runtime = { version = "4.0.0-dev", path = "../runtime" }
+magport-node-runtime = { version = "4.0.0-dev", path = "../runtime" }
 node-primitives = { version = "2.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0", default-features = false }
 primitives-avail = { path = "../primitives/avail"}
 # CLI-specific dependencies
@@ -97,13 +94,13 @@ substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/pa
 default = []
 # Dependencies that are only required if runtime benchmarking should be build.
 runtime-benchmarks = [
-	"node-template-runtime/runtime-benchmarks",
+	"magport-node-runtime/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-benchmarking-cli/runtime-benchmarks",
 ]
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
 try-runtime = [
-	"node-template-runtime/try-runtime",
+	"magport-node-runtime/try-runtime",
 	"try-runtime-cli/try-runtime",
 ]

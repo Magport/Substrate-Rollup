@@ -65,7 +65,7 @@ where
 			Call::DataAvailability(da_call) => match da_call {
 				DaCall::submit_data { data } => {
 					// log::info!("=======get:{:?}", data);
-					let _rollup_block = node_template_runtime::Block::decode(&mut &data.0[..]);
+					let _rollup_block = magport_node_runtime::Block::decode(&mut &data.0[..]);
 					// log::info!("=======get block:{:?}", rollup_block);
 					let rollup_block_hash = client.block_hash(block_number_solo.into());
 					let mut find_flag = false;
