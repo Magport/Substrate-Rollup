@@ -1,10 +1,10 @@
 use hex_literal::hex;
-use node_primitives::*;
 use magport_node_runtime::{
 	constants::currency::*, AccountId, BabeConfig, BalancesConfig, ImOnlineConfig, MaxNominations,
 	RuntimeGenesisConfig, SessionConfig, SessionKeys, Signature, StakerStatus, StakingConfig,
 	SudoConfig, SystemConfig, WASM_BINARY,
 };
+use node_primitives::*;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_chain_spec::Properties;
 use sc_service::ChainType;

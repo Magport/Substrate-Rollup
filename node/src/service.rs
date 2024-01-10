@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
 
-use node_primitives::Block;
 use magport_node_runtime::RuntimeApi;
+use node_primitives::Block;
 
 use crate::{
 	avail_task::spawn_avail_task,
