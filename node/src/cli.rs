@@ -21,6 +21,10 @@ pub struct Cli {
 	#[allow(missing_docs)]
 	#[clap(flatten)]
 	pub storage_monitor: sc_storage_monitor::StorageMonitorParams,
+
+	/// Avail RPC Port Number, default is 9945.
+	#[arg(long, default_value = "9945")]
+	pub avail_rpc_port: u16,
 }
 
 #[derive(Debug, clap::Subcommand)]

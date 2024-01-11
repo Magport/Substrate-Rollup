@@ -1,10 +1,10 @@
 use hex_literal::hex;
-use node_primitives::*;
-use node_template_runtime::{
+use magport_node_runtime::{
 	constants::currency::*, AccountId, BabeConfig, BalancesConfig, ImOnlineConfig, MaxNominations,
 	RuntimeGenesisConfig, SessionConfig, SessionKeys, Signature, StakerStatus, StakingConfig,
 	SudoConfig, SystemConfig, WASM_BINARY,
 };
+use node_primitives::*;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_chain_spec::Properties;
 use sc_service::ChainType;
@@ -296,7 +296,7 @@ fn testnet_genesis(
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
 		},
 		babe: BabeConfig {
-			epoch_config: Some(node_template_runtime::BABE_GENESIS_EPOCH_CONFIG),
+			epoch_config: Some(magport_node_runtime::BABE_GENESIS_EPOCH_CONFIG),
 			..Default::default()
 		},
 		grandpa: Default::default(),
